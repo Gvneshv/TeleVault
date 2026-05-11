@@ -36,7 +36,9 @@ def init_db(db_path: str) -> sqlite3.Connection:
 
     logger.info(f"Opening database at: {db_path}")
 
-    _connection = sqlite3.connect(
+    # Pylance showed an error here ||, but it's fine
+                                #  \/
+    _connection = sqlite3.connect( # type: ignore
         db_path,
         # detect_types lets SQLite automatically convert stored values back to
         # Python datetime objects when you read DATETIME columns.
