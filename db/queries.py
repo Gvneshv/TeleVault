@@ -30,16 +30,22 @@ logger = logging.getLogger(__name__)
 # Chats
 # ---------------------------------------------------------------------------
 
-def upsert_chat(conn: sqlite3.Connection, chat_id: int, name: str | None, chat_type: str) -> None:
+def upsert_chat(conn: sqlite3.Connection, chat_id: int, name: str | None, chat_type: str, username: str | None = None) -> None:
     """
     Insert a chat record if it doesn't exist yet.
-    We don't update existing rows - the name at first_seen is what we keep.
-    (A future 'chat history' feature could track renames separately.)
+    
+    The ``username`` is the @handle - present for public groups and channels,
+    None for private chats and legacy groups without a public link.
+    Stored as-is without the leading '@' for cleaner querying.
+ 
+    Existing rows are left untouched (INSERT OR IGNORE). Name/username
+    changes over time are not tracked yet - that's a future feature.
+
     """
     with conn:
         conn.execute(
-            "INSERT OR IGNORE INTO chats (chat_id, name, chat_type) VALUES (?, ?, ?)",
-            (chat_id, name, chat_type),
+            "INSERT OR IGNORE INTO chats (chat_id, name, username, chat_type) VALUES (?, ?, ?, ?)",
+            (chat_id, name, username, chat_type),
         )
 
 
@@ -172,7 +178,7 @@ def record_edit(conn: sqlite3.Connection, tg_message_id: int, chat_id: int, new_
         conn.execute(
             """
             UPDATE messages
-            SET text = ?, is_edited = TRUE
+            SET text = ?, is_edited = TRUE, edited_at = ?
             WHERE id = ?
             """,
             (new_text, ts, internal_id),
@@ -208,11 +214,15 @@ def get_deleted_messages(conn: sqlite3.Connection, chat_id: int | None = None, l
     """
     Retrieve deleted messages, optionally filtered by chat.
     Ordered newest-deleted first.
+
+    Each row includes chat_name and chat_username from the joined chats table,
+    useful for display without a second query.
+
     """
     if chat_id is not None:
         cursor = conn.execute(
             """
-            SELECT m.*, c.name AS chat_name
+            SELECT m.*, c.name AS chat_name, c.username AS chat_username
             FROM messages m
             JOIN chats c ON m.chat_id = c.chat_id
             WHERE m.is_deleted = TRUE AND m.chat_id = ?
@@ -224,7 +234,7 @@ def get_deleted_messages(conn: sqlite3.Connection, chat_id: int | None = None, l
     else:
         cursor.execute(
             """
-            SELECT m.*, c.name AS chat_name
+            SELECT m.*, c.name AS chat_name, c.username AS chat_username
             FROM messages m
             JOIN chats c ON m.chat_id = c.chat_id
             WHERE m.is_deleted = TRUE
