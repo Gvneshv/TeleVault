@@ -42,7 +42,7 @@ def init_db(db_path: str) -> sqlite3.Connection:
         db_path,
         # detect_types lets SQLite automatically convert stored values back to
         # Python datetime objects when you read DATETIME columns.
-        detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES
+        detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
         # check_same_thread=False is required here because Telethon runs its
         # event loop in a separate thread from the main thread.
         check_same_thread=False,
