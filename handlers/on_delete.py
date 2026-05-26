@@ -1,6 +1,5 @@
 """
-Handles Telethon's MessageDeleted event — fired when one or more messages
-are removed from a chat.
+Handles Telethon's MessageDeleted event - fired when one or more messages are removed from a chat.
  
 The important protocol limitation documented here:
  
@@ -36,8 +35,7 @@ def register(client) -> None:
         """
         Flag deleted messages in the database.
  
-        `event.deleted_ids` is always a list - Telegram can batch-delete
-        multiple messages in one update (e.g. clearing a chat history).
+        `event.deleted_ids` is always a list - Telegram can batch-delete multiple messages in one update (e.g. clearing a chat history).
         """
         chat_id = event.chat_id             # None for private/group deletions
         deleted_ids = event.deleted_ids     # Always a list (list[int])
@@ -59,8 +57,7 @@ def register(client) -> None:
             # We have the message IDs but not the chat. Flag whatever we can
             # find by ID alone and log the ambiguity.
             logger.debug(
-                f"Deletion event with no chat_id — "
-                f"attempting fallback for {len(deleted_ids)} message(s)."
+                f"Deletion event with no chat_id - attempting fallback for {len(deleted_ids)} message(s)."
             )
             for msg_id in deleted_ids:
                 try:
@@ -85,28 +82,26 @@ def _flag_deleted_without_chat(conn, tg_message_id: int) -> None:
     affected rather than staring at a list of raw IDs.
  
     If the message isn't in the DB at all (sent before TeleVault was running),
-    queries.flag_deleted already logs a warning — nothing extra needed here.
+    queries.flag_deleted already logs a warning - nothing extra needed here.
     """
     from datetime import datetime, timezone
 
-    # Join with chats so we get name + username alongside each match.
-    # Raw SQL here because this is a fallback for a protocol edge-case,
-    # not a general-purpose operation that belongs in queries.py.
+    # Written as concatenated single-line strings to avoid CRLF issues on
+    # Windows - multi-line triple-quoted strings can contain \r characters
+    # after Git checkout, which SQLite's parser rejects mid-statement.
+    # Also uses is_deleted = 0 (not FALSE) to match the INTEGER schema column.
     cursor = conn.execute(
-        """
-        SELECT m.tg_message_id, m.chat_id c.name AS chat_name, c.username AS chat_username
-        FROM messages m
-        LEFT JOIN chats c ON m.chat_id = c.chat_id
-        WHERE m.tg_message_id = ? AND m.is_deleted = FALSE
-        """,
-        (tg_message_id,)
+        "SELECT m.tg_message_id, m.chat_id c.name AS chat_name, c.username AS chat_username"
+        " FROM messages m"
+        " LEFT JOIN chats c ON m.chat_id = c.chat_id"
+        " WHERE m.tg_message_id = ? AND m.is_deleted = 0",
+        (tg_message_id,),
     )
     rows = cursor.fetchall()
 
     if not rows:
         logger.warning(
-            f"Deletion fallback: message {tg_message_id} not found in DB "
-            f"(possibly sent before TeleVault was running)."
+            f"Deletion fallback: message {tg_message_id} not found in DB (possibly sent before TeleVault was running)."
         )
         return
     
@@ -124,10 +119,14 @@ def _flag_deleted_without_chat(conn, tg_message_id: int) -> None:
 
     for row in rows:
         logger.info(
-            f"Deletion fallback: flagging message {tg_message_id} in "
-            f"{_format_chat(row['chat_id'], row['chat_name'], row['chat_username'])}."
+            f"Deletion fallback: flagging message {tg_message_id} in {_format_chat(row['chat_id'], row['chat_name'], row['chat_username'])}."
         )
-        db.queries.flag_deleted(conn, tg_message_id=row["tg_message_id"], chat_id=row["chat_id"], deleted_at=datetime.now(timezone.utc))
+        db.queries.flag_deleted(
+            conn, 
+            tg_message_id=row["tg_message_id"], 
+            chat_id=row["chat_id"], 
+            deleted_at=datetime.now(timezone.utc)
+        )
 
 
 
