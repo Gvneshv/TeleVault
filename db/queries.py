@@ -9,10 +9,15 @@ Design rules followed here:
     manager (it now starts an explicit transaction), which can cause FK checks
     to fail when a prior 'with conn:' block committed a parent row that the
     next block's transaction can't yet see. Explicit commits are unambiguous on every Python version.
-  - INSERT OR IGNORE is used where duplicate arrivals are possible
-    (e.g. Telegram sometimes re-delivers events on reconnect).
-  - Functions return meaningful values (row ID, bool, fetched row) so callers
-    can log or react without querying again.
+  - Timestamps are stored in the local system timezone, not UTC.
+    _now() returns local time; _localise() converts incoming UTC datetimes
+    (e.g. message.date from Telethon) to local time before storage.
+    Exception: chats.first_seen and senders.first_seen use SQLite's
+    DEFAULT CURRENT_TIMESTAMP (UTC) - they're metadata, not message times.
+  - archived_at in insert_message is passed explicitly so it uses local time
+    rather than falling back to SQLite's UTC DEFAULT CURRENT_TIMESTAMP.
+  - INSERT OR IGNORE is used where duplicate arrivals are possible (e.g. Telegram sometimes re-delivers events on reconnect).
+  - Functions return meaningful values (row ID, bool, fetched row) so callers can log or react without querying again.
   - Boolean flags in the schema are INTEGER (0/1). Comparisons use 1/0
     rather than TRUE/FALSE to stay consistent with the DDL and avoid any SQLite version dependency.
 """
@@ -24,11 +29,27 @@ from datetime import datetime, timezone
 logger = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# Timezone helpers
+# ---------------------------------------------------------------------------
+
 def _now() -> datetime:
     """
-    Return the current UTC time as a timezone-aware datetime object.
+    Current time in the local system timezone.
     """
-    return datetime.now(timezone.utc)
+    return datetime.now().astimezone()
+
+
+def _localise(dt: datetime) -> datetime:
+    """
+    Convert any datetime to the local system timezone.
+ 
+    Naive datetimes are assumed to be UTC (which is what Telethon provides for message.date before Python's sqlite3 applies the registered converter).
+    Timezone-aware datetimes are converted directly.
+    """
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone()
 
 
 def _commit(conn: sqlite3.Connection) -> None:
@@ -63,6 +84,8 @@ def upsert_chat(
     Existing rows are left untouched (INSERT OR IGNORE). Name/username
     changes over time are not tracked yet - that's a future feature.
 
+    Note: first_seen uses SQLite's DEFAULT CURRENT_TIMESTAMP (UTC).
+    This column is metadata about when TeleVault first saw the chat, not a message timestamp, so the UTC offset is acceptable here.
     """
     try:
         conn.execute(
@@ -90,6 +113,12 @@ def upsert_sender(
     """
     Insert a sender record if it doesn't exist yet.
     Same rationale as upsert_chat - we preserve the first-seen identity.
+
+    Note: for anonymous admin posts in supergroups, Telegram sets the
+    sender to the group itself, so sender_id may be a negative channel ID
+    rather than a user ID. These rows end up in the senders table with
+    whatever fields the channel entity exposes (usually just a name/username).
+    This is a Telegram protocol behaviour, not a bug.
     """
     try:
         conn.execute(
@@ -118,17 +147,22 @@ def insert_message(
     """
     Store a new incoming or outgoing message.
 
-    ``is_edited`` should be True when this insert is a fallback from the edit
-    handler - the message wasn't in the DB yet, but we know it has been
-    edited at least once.
+    date (Telegram's send timestamp) is converted to local time before storage. 
+    archived_at is set to the current local time explicitly so it doesn't fall back to SQLite's UTC DEFAULT CURRENT_TIMESTAMP.
+
+    `is_edited` should be True when this insert is a fallback from the edit
+    handler - the message wasn't in the DB yet, but we know it has been edited at least once.
  
     Returns the internal row ID (messages.id) on success, or None if the
     message was already present (INSERT OR IGNORE - safe on re-delivery)
     """
+    local_date = _localise(date)
+    local_archived_at = _now()
+
     try:
         cursor = conn.execute(
-            "INSERT OR IGNORE INTO messages (tg_message_id, chat_id, sender_id, text, date, is_edited) VALUES (?, ?, ?, ?, ?, ?)",
-            (tg_message_id, chat_id, sender_id, text, date, 1 if is_edited else 0),
+            "INSERT OR IGNORE INTO messages (tg_message_id, chat_id, sender_id, text, date, is_edited, archived_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (tg_message_id, chat_id, sender_id, text, local_date, 1 if is_edited else 0), local_archived_at,
         )
         _commit(conn)
     except Exception:
@@ -156,39 +190,40 @@ def flag_deleted(
     deleted_at: datetime | None = None
 ) -> bool:
     """
-    Mark a message as deleted.
+    Mark a message as deleted and record a deletion snapshot.
  
-    Telegram's MessageDeleted event gives the message ID and chat ID,
-    but not the message content - that's already in our DB. We just flip
-    the flag and record when the deletion was detected.
+    The snapshot (text at time of deletion) is written to message_deletions
+    atomically with the flag update - both succeed or both roll back.
  
-    Returns True if a row was updated, False if the message wasn't in our DB.
-    (We may not have it if the app wasn't running when it was sent.)
+    Returns True if the row was found and flagged, False if the message
+    wasn't in the DB (may have been sent before TeleVault was running).
     """
-    ts = deleted_at or _now()
+    ts = _localise(deleted_at) if deleted_at else _now()
+    row = get_message(conn, tg_message_id, chat_id)
 
+    if row is None or row["is_deleted"] == 1:
+        logger.warning(
+            f"Deletion event for message {tg_message_id} in chat {chat_id} - not found in DB or already flagged (possibly sent before TeleVault was running)."
+        )
+        return False
+    
     try:
-        cursor = conn.execute(
-            "UPDATE messages SET is_deleted = 1, deleted_at = ? WHERE tg_message_id = ? AND chat_id = ? AND is_deleted = 0",
-            (ts, tg_message_id, chat_id),
+        conn.execute(
+            "UPDATE messages SET is_deleted = 1, deleted_at = ? WHERE id = ?",
+            (ts, row["id"]),
+        )
+        conn.execute(
+            "INSERT INTO message_deletions (message_id, text_snapshot, deleted_at) VALUES (?, ?, ?)",
+            (row["id"], row["text"], ts),
         )
         _commit(conn)
     except Exception:
         conn.rollback()
         raise
     
+    logger.info(f"Flagged message {tg_message_id} in chat {chat_id} as deleted at {ts}.")
 
-    found = cursor.rowcount > 0
-
-    if found:
-        logger.info(f"Flagged message {tg_message_id} in chat {chat_id} as deleted at {ts}.")
-    else:
-        logger.warning(
-            f"Deletion event for message {tg_message_id} in chat {chat_id} "
-            f"- not found in DB (possibly sent before the app was running)."
-        )
-
-    return found
+    return True
 
 
 def record_edit(
@@ -202,12 +237,13 @@ def record_edit(
     Handle an edited message:
       1. Fetch the current text from messages (becomes old_text in the log).
       2. Insert a row into message_edits with old and new text.
-      3. Update messages with the new text and mark is_edited = TRUE.
+      3. Update messages with the new text and mark is_edited = 1.
+
+    Steps 2 and 3 are committed atomically.
  
     Returns True on success, False if the message wasn't found in the DB.
     """
-    ts = edited_at or _now()
-
+    ts = _localise(edited_at) if edited_at else _now()
     row = get_message(conn, tg_message_id, chat_id)
 
     if row is None:
@@ -270,9 +306,7 @@ def get_deleted_messages(
     Retrieve deleted messages, optionally filtered by chat.
     Ordered newest-deleted first.
 
-    Each row includes chat_name and chat_username from the joined chats table,
-    useful for display without a second query.
-
+    Each row includes chat_name and chat_username from the joined chats table, so callers don't need a second query to display context.
     """
     if chat_id is not None:
         cursor = conn.execute(
@@ -314,3 +348,24 @@ def get_edit_history(
         (row["id"],),
     )
     return cursor.fetchall()
+
+
+def get_deletion_record(
+    conn: sqlite3.Connection, 
+    tg_message_id: int, 
+    chat_id: int
+) -> sqlite3.Row | None:
+    """
+    Fetch the deletion record for a message, if one exists.
+ 
+    Returns the message_deletions row (with text_snapshot and deleted_at) or None if the message was never flagged as deleted.
+    """
+    row = get_message(conn, tg_message_id, chat_id)
+    if row is None:
+        return None
+    
+    cursor = (
+        "SELECT * FROM message_deletions WHERE message_id = ?",
+        (row["id"],)
+    )
+    return cursor.fetchone()

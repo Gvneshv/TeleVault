@@ -33,27 +33,23 @@ _connection: sqlite3.Connection | None = None
 
 
 # ---------------------------------------------------------------------------
-# Datetime adapters — registered once at import time
+# Datetime adapters - registered once at import time
 # ---------------------------------------------------------------------------
 
 def _adapt_datetime(dt: datetime) -> str:
     """
     Serialize a Python datetime to an ISO 8601 string for SQLite storage.
-    Timezone-aware datetimes keep their offset; naive ones are stored as-is.
+    Timezone-aware datetimes keep their offset(e.g. '+02:00'), so stored
+    timestamps are unambiguous and human-readable when querying the DB directly.
     """
     return dt.isoformat()
 
 
-def _convert_datetime(raw: bytes) -> datetime:
-    """
-    Deserialize an ISO 8601 byte string from SQLite back to a Python datetime.
-    Handles both timezone-aware ('...+00:00') and naive ('...') formats.
-    """
-    return datetime.fromisoformat(raw.decode())
-
-
 sqlite3.register_adapter(datetime, _adapt_datetime)
-sqlite3.register_converter("DATETIME", _convert_datetime)
+# No register_converter - detect_types is intentionally omitted from the
+# connection (see init_db). Datetimes read from DATETIME columns come back
+# as ISO 8601 strings; that's correct for Phase 1 where we don't do any
+# datetime arithmetic on values retrieved from the DB.
 
 
 # ---------------------------------------------------------------------------
@@ -63,10 +59,9 @@ sqlite3.register_converter("DATETIME", _convert_datetime)
 def init_db(db_path: str) -> sqlite3.Connection:
     """
     Open the SQLite database at the given path, apply performance settings,
-    and return the connection. Also stores it internally so get_connection()
-    can retrieve it later without needing the path again.
+    and return the connection. Also stores it internally so get_connection() can retrieve it later without needing the path again.
  
-    Creates the database file if it doesn't exist yet.
+    Creates the file and any parent directories if they don't exist yet.
     """
     global _connection
 
@@ -79,11 +74,11 @@ def init_db(db_path: str) -> sqlite3.Connection:
                                 #  \/
     _connection = sqlite3.connect( # type: ignore
         db_path,
-        # PARSE_DECLTYPES enables our registered DATETIME converter above,
-        # turning TEXT columns declared as DATETIME back into Python datetimes automatically on read.
-        detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
-        # check_same_thread=False is required here because Telethon runs its event loop in a separate thread from the main thread.
-        # Without this flag, sqlite3 raises an error on cross-thread access.
+        # detect_types is intentionally omitted.
+        # In Python 3.14, PARSE_DECLTYPES|PARSE_COLNAMES changed behaviour and
+        # breaks any query that uses dot-notation table aliases (m.col, c.col), producing spurious "near '.': syntax error" at runtime.
+        # The datetime adapter below still serialises datetime -> ISO string on INSERT; 
+        # on SELECT, DATETIME columns come back as plain strings, which is fine for Phase 1 where we don't do datetime arithmetic in Python.
         check_same_thread=False,
     )
 
@@ -93,11 +88,11 @@ def init_db(db_path: str) -> sqlite3.Connection:
 
     # WAL mode: writes go to a separate log file first, so readers are never
     # blocked by a write in progress. Better performance for our use case
-    _connection.execute("PRAGMA journal_mode = WAL;")
+    _connection.execute("PRAGMA journal_mode=WAL;")
 
     # Foreign key enforcement is OFF by default in SQLite - turn it on so our
     # FK constraints (chat_id, sender_id) are actually enforced.
-    _connection.execute("PRAGMA foreign_keys = ON;")
+    _connection.execute("PRAGMA foreign_keys=ON;")
 
     logger.info("Database connection established.")
     return _connection
@@ -116,7 +111,7 @@ def get_connection() -> sqlite3.Connection:
 def close_db() -> None:
     """
     Cleanly close the database connection.
-    Call this on application shutdown so any buffered WAL data is flushed.
+    Should be called on application shutdown so any buffered WAL data is written to the main database file.
     """
     global _connection
     if _connection is not None:

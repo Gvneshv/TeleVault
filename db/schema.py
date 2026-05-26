@@ -10,6 +10,7 @@ Table overview:
   - senders     : one row per Telegram user we've seen
   - messages    : every archived message
   - message_edits : full edit history for messages that were changed
+  - message_deletions : full deletion history for messages that were deleted
 
 Schema change log:
   v1 (initial) : chats, senders, messages, message_edits
