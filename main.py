@@ -89,8 +89,15 @@ async def main() -> None:
     logger.info("TeleVault is running. Press Ctrl-C to stop.")
 
     # Handle SIGTERM gracefully (sent by systemd or Docker on shutdown)
+    # add_signal_handler() is Unix-only — Windows raises NotImplementedError.
+    # On Windows, Ctrl-C (SIGINT) via the KeyboardInterrupt except below is
+    # the only shutdown path needed during local development anyway.
     loop = asyncio.get_running_loop()
-    loop.add_signal_handler(signal.SIGTERM, lambda: loop.stop())
+    try:
+        loop.add_signal_handler(signal.SIGTERM, lambda: loop.stop())
+    except NotImplementedError:
+        # Expected on Windows. SIGTERM is a Unix concept; skip silently.
+        pass
 
     try:
         await client.run_until_disconnected()

@@ -82,8 +82,8 @@ CREATE TABLE IF NOT EXISTS messages (
     deleted_at      DATETIME,
     archived_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (chat_id)   REFERENCES chats(chat_id),
-    FOREIGN KEY (sender_id) REFERENCES senders(sender_id),
-)
+    FOREIGN KEY (sender_id) REFERENCES senders(sender_id)
+);
 """
 
 # A compound unique index on (tg_message_id, chat_id) is critical.
