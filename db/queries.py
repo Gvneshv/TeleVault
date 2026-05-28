@@ -84,11 +84,17 @@ def upsert_chat(
     Existing rows are left untouched (INSERT OR IGNORE). Name/username
     changes over time are not tracked yet - that's a future feature.
 
+    Raises RuntimeError if INSERT OR IGNORE silently ignores the row AND
+    the row is still absent afterwards - which means a constraint violation
+    (most likely chat_type failing the CHECK constraint). Surfacing this
+    explicitly prevents the FK error that would otherwise appear later in
+    insert_message with no indication of what actually went wrong.
+
     Note: first_seen uses SQLite's DEFAULT CURRENT_TIMESTAMP (UTC).
     This column is metadata about when TeleVault first saw the chat, not a message timestamp, so the UTC offset is acceptable here.
     """
     try:
-        conn.execute(
+        cursor = conn.execute(
             "INSERT OR IGNORE INTO chats (chat_id, name, username, chat_type) VALUES (?, ?, ?, ?)",
             (chat_id, name, username, chat_type),
         )
@@ -96,6 +102,20 @@ def upsert_chat(
     except Exception:
         conn.rollback()
         raise
+
+    if cursor.rowcount == 0:
+        # Might be a pre-existing row (normal) or a silent constraint failure (bad).
+        exists = conn.execute(
+            "SELECT 1 FROM chats WHERE chat_id = ?", (chat_id,)
+        ).fetchone()
+        if not exists:
+            raise RuntimeError(
+                f"upsert_chat: failed to insert chat_id={chat_id!r} "
+                f"(chat_type={chat_type!r}, name={name!r}). "
+                f"INSERT OR IGNORE silently rejected the row - the chat_type value "
+                f"likely failed the CHECK constraint. "
+                f"Valid values: 'private', 'group', 'supergroup', 'channel'."
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -119,9 +139,12 @@ def upsert_sender(
     rather than a user ID. These rows end up in the senders table with
     whatever fields the channel entity exposes (usually just a name/username).
     This is a Telegram protocol behaviour, not a bug.
+
+    Raises RuntimeError if INSERT OR IGNORE silently fails and the row is
+    still absent - mirrors the same guard in upsert_chat.
     """
     try:
-        conn.execute(
+        cursor = conn.execute(
             "INSERT OR IGNORE INTO senders (sender_id, username, first_name, last_name) VALUES (?, ?, ?, ?)",
             (sender_id, username, first_name, last_name),
         )
@@ -129,6 +152,19 @@ def upsert_sender(
     except Exception:
         conn.rollback()
         raise
+
+    if cursor.rowcount == 0:
+        # Might be a pre-existing row (normal) or a silent constraint failure (bad).
+        exists = conn.execute(
+            "SELECT 1 FROM senders WHERE sender_id = ?", (sender_id,)
+        ).fetchone()
+        if not exists:
+            raise RuntimeError(
+                f"upsert_sender: failed to insert sender_id={sender_id!r} "
+                f"(username={username!r}, first_name={first_name!r}, last_name={last_name!r}). "
+                f"INSERT OR IGNORE silently rejected the row - the sender_id value "
+                f"likely failed the CHECK constraint."
+            )
 
 
 # ---------------------------------------------------------------------------
