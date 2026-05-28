@@ -42,7 +42,7 @@ def _adapt_datetime(dt: datetime) -> str:
     Timezone-aware datetimes keep their offset(e.g. '+02:00'), so stored
     timestamps are unambiguous and human-readable when querying the DB directly.
     """
-    return dt.isoformat()
+    return dt.isoformat(timespec="seconds")
 
 
 sqlite3.register_adapter(datetime, _adapt_datetime)

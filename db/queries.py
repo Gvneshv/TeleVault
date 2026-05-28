@@ -162,7 +162,7 @@ def insert_message(
     try:
         cursor = conn.execute(
             "INSERT OR IGNORE INTO messages (tg_message_id, chat_id, sender_id, text, date, is_edited, archived_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (tg_message_id, chat_id, sender_id, text, local_date, 1 if is_edited else 0), local_archived_at,
+            (tg_message_id, chat_id, sender_id, text, local_date, 1 if is_edited else 0, local_archived_at),
         )
         _commit(conn)
     except Exception:
