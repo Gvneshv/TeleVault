@@ -209,6 +209,42 @@ def insert_message(
     local_archived_at = _now()
 
     try:
+        # Defensive FK upserts - ensure parent rows exist within this same
+        # transaction before the messages INSERT runs its FK check.
+        #
+        # In the normal flow, the caller already ran upsert_chat/upsert_sender
+        # (with commit=False), so these are always-safe no-ops on existing PKs.
+        # They matter for edge cases where the parent rows weren't created first:
+        #
+        #   - Scheduled / auto-posted messages that bypass NewMessage (Telegram
+        #     delivers them as updateShortSentMessage, which Telethon's NewMessage
+        #     handler doesn't receive, so the chat is never seen before the edit).
+        #   - Messages sent while TeleVault was offline - we only see the edit.
+        #   - Any Python 3.14 transaction-isolation quirk that breaks commit=False.
+        #
+        # INSERT OR IGNORE on an existing PK is a sub-millisecond no-op in SQLite.
+        chat_stub = conn.execute(
+            "INSERT OR IGNORE INTO chats (chat_id, name, chat_type) VALUES (?, ?, ?)",
+            (chat_id, None, "group"),
+        )
+        if chat_stub.rowcount > 0:
+            logger.warning(
+                f"insert_message: chat {chat_id} had no row before insert - "
+                f"created a stub. Parent upsert may have been skipped."
+            )
+        
+        if sender_id is not None:
+            sender_stub = conn.execute(
+                "INSERT OR IGNORE INTO senders (sender_id, username, first_name, last_name) VALUES (?, ?, ?, ?)",
+                (sender_id, None, None, None),
+            )
+            if sender_stub.rowcount > 0:
+                logger.warning(
+                    f"insert_message: sender {sender_id} had no row before insert - "
+                    f"created a stub. Parent upsert may have been skipped."
+                )
+
+
         cursor = conn.execute(
             "INSERT OR IGNORE INTO messages (tg_message_id, chat_id, sender_id, text, date, is_edited, archived_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (tg_message_id, chat_id, sender_id, text, local_date, 1 if is_edited else 0, local_archived_at),
@@ -305,6 +341,16 @@ def record_edit(
     old_text = row["text"]
     internal_id = row["id"]
 
+    # Telegram fires MessageEdited for non-text changes too: link preview
+    # generation, inline keyboard updates, view count changes, etc.
+    # If the text is identical, there's nothing useful to record.
+    if old_text == new_text:
+        logger.debug(
+            f"Edit event for message {tg_message_id} in chat {chat_id} — "
+            f"text unchanged (likely link preview or markup update). Skipping."
+        )
+        return True
+    
     try:
         conn.execute(
             "INSERT INTO message_edits (message_id, old_text, new_text, edited_at) VALUES (?, ?, ?, ?)",
