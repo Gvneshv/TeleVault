@@ -72,7 +72,8 @@ def upsert_chat(
     chat_id: int, 
     name: str | None, 
     chat_type: str, 
-    username: str | None = None
+    username: str | None = None,
+    commit: bool = True,
 ) -> None:
     """
     Insert a chat record if it doesn't exist yet.
@@ -84,38 +85,47 @@ def upsert_chat(
     Existing rows are left untouched (INSERT OR IGNORE). Name/username
     changes over time are not tracked yet - that's a future feature.
 
-    Raises RuntimeError if INSERT OR IGNORE silently ignores the row AND
-    the row is still absent afterwards - which means a constraint violation
-    (most likely chat_type failing the CHECK constraint). Surfacing this
-    explicitly prevents the FK error that would otherwise appear later in
-    insert_message with no indication of what actually went wrong.
+    commit=False
+        Skip the commit, leaving the INSERT as part of the caller's ongoing
+        transaction. Use this when upsert_chat and upsert_sender are called
+        immediately before insert_message - grouping all three into one
+        transaction lets the FK check in insert_message see the parent rows
+        within the same transaction, which solves a SQLite WAL snapshot
+        isolation issue that causes FK failures when each operation commits
+        separately.
+ 
+    When commit=True (the default), a RuntimeError is raised if INSERT OR
+    IGNORE silently dropped the row and it's still absent - which means the
+    chat_type value failed the CHECK constraint.
 
     Note: first_seen uses SQLite's DEFAULT CURRENT_TIMESTAMP (UTC).
     This column is metadata about when TeleVault first saw the chat, not a message timestamp, so the UTC offset is acceptable here.
     """
+    conn.execute(
+        "INSERT OR IGNORE INTO chats (chat_id, name, username, chat_type) VALUES (?, ?, ?, ?)",
+        (chat_id, name, username, chat_type),
+    )
+
+    if not commit:
+        return
+
     try:
-        cursor = conn.execute(
-            "INSERT OR IGNORE INTO chats (chat_id, name, username, chat_type) VALUES (?, ?, ?, ?)",
-            (chat_id, name, username, chat_type),
-        )
         _commit(conn)
     except Exception:
         conn.rollback()
         raise
 
-    if cursor.rowcount == 0:
-        # Might be a pre-existing row (normal) or a silent constraint failure (bad).
-        exists = conn.execute(
-            "SELECT 1 FROM chats WHERE chat_id = ?", (chat_id,)
-        ).fetchone()
-        if not exists:
-            raise RuntimeError(
-                f"upsert_chat: failed to insert chat_id={chat_id!r} "
-                f"(chat_type={chat_type!r}, name={name!r}). "
-                f"INSERT OR IGNORE silently rejected the row - the chat_type value "
-                f"likely failed the CHECK constraint. "
-                f"Valid values: 'private', 'group', 'supergroup', 'channel'."
-            )
+    exists = conn.execute(
+        "SELECT 1 FROM chats WHERE chat_id = ?", (chat_id,)
+    ).fetchone()
+    if not exists:
+        raise RuntimeError(
+            f"upsert_chat: failed to insert chat_id={chat_id!r} "
+            f"(chat_type={chat_type!r}, name={name!r}). "
+            f"INSERT OR IGNORE silently rejected the row - the chat_type value "
+            f"likely failed the CHECK constraint. "
+            f"Valid values: 'private', 'group', 'supergroup', 'channel'."
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -128,7 +138,8 @@ def upsert_sender(
     sender_id: int, 
     username: str | None, 
     first_name: str | None, 
-    last_name: str | None
+    last_name: str | None,
+    commit: bool = True,
 ) -> None:
     """
     Insert a sender record if it doesn't exist yet.
@@ -140,31 +151,33 @@ def upsert_sender(
     whatever fields the channel entity exposes (usually just a name/username).
     This is a Telegram protocol behaviour, not a bug.
 
-    Raises RuntimeError if INSERT OR IGNORE silently fails and the row is
-    still absent - mirrors the same guard in upsert_chat.
+    commit=False: same semantics as upsert_chat - see its docstring.
+    When commit=True, a RuntimeError is raised if the row is absent after a silent INSERT OR IGNORE.
     """
+    conn.execute(
+        "INSERT OR IGNORE INTO senders (sender_id, username, first_name, last_name) VALUES (?, ?, ?, ?)",
+        (sender_id, username, first_name, last_name),
+    )
+
+    if not commit:
+        return
+
     try:
-        cursor = conn.execute(
-            "INSERT OR IGNORE INTO senders (sender_id, username, first_name, last_name) VALUES (?, ?, ?, ?)",
-            (sender_id, username, first_name, last_name),
-        )
         _commit(conn)
     except Exception:
         conn.rollback()
         raise
 
-    if cursor.rowcount == 0:
-        # Might be a pre-existing row (normal) or a silent constraint failure (bad).
-        exists = conn.execute(
-            "SELECT 1 FROM senders WHERE sender_id = ?", (sender_id,)
-        ).fetchone()
-        if not exists:
-            raise RuntimeError(
-                f"upsert_sender: failed to insert sender_id={sender_id!r} "
-                f"(username={username!r}, first_name={first_name!r}, last_name={last_name!r}). "
-                f"INSERT OR IGNORE silently rejected the row - the sender_id value "
-                f"likely failed the CHECK constraint."
-            )
+    exists = conn.execute(
+        "SELECT 1 FROM senders WHERE sender_id = ?", (sender_id,)
+    ).fetchone()
+    if not exists:
+        raise RuntimeError(
+            f"upsert_sender: failed to insert sender_id={sender_id!r} "
+            f"(username={username!r}, first_name={first_name!r}, last_name={last_name!r}). "
+            f"INSERT OR IGNORE silently rejected the row - the sender_id value "
+            f"likely failed the CHECK constraint."
+        )
 
 
 # ---------------------------------------------------------------------------
