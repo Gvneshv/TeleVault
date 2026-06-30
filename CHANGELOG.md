@@ -18,6 +18,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Single-page vanilla JS web UI (`web/` package) served as static files
 - Views: chat list, message browser, deleted messages, global search, stats dashboard
 - PWA support: `manifest.json` + service worker for installable app on all platforms
+- Call service messages now stored with humanized text labels ([Missed call], [Voice call · N min], etc.) instead of NULL
 
 ### Planned — Phase 3 (Advanced Features)
 
