@@ -1,9 +1,8 @@
 """
 Defines and creates all database tables.
  
-This module is run once on startup (via apply_schema). All statements use
-CREATE TABLE IF NOT EXISTS, so re-running on an existing database is safe -
-it simply does nothing if the tables are already there.
+This module is run once on startup (via apply_schema).
+All statements use CREATE TABLE IF NOT EXISTS, so re-running on an existing database is safe - it simply does nothing if the tables are already there.
  
 Table overview:
   - chats       : one row per Telegram chat/channel/DM
@@ -29,8 +28,7 @@ logger = logging.getLogger(__name__)
 #
 # Rules for these strings:
 #   1. No inline SQL comments (-- ...) inside the DDL body.
-#      On Windows, Git's CRLF conversion can place a bare \r before a comment,
-#      which confuses SQLite's parser and produces "near ')': syntax error".
+#      On Windows, Git's CRLF conversion can place a bare \r before a comment, which confuses SQLite's parser and produces "near ')': syntax error".
 #      All explanatory notes live here, above each string, as Python comments.
 #   2. BOOLEAN columns use INTEGER DEFAULT 0 / 1 - not FALSE / TRUE.
 #      TRUE/FALSE as SQL keywords were only made reliable in SQLite 3.23.0.
@@ -38,8 +36,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 # chat_type is restricted to four known values via a CHECK constraint.
-# username stores the @handle for groups/channels; NULL for private chats
-# and legacy groups that have no public link.
+# username stores the @handle for groups/channels; NULL for private chats and legacy groups that have no public link.
 _CREATE_CHATS = """
 CREATE TABLE IF NOT EXISTS chats (
   chat_id       INTEGER PRIMARY KEY,
@@ -63,11 +60,9 @@ CREATE TABLE IF NOT EXISTS senders (
 """
 
 # Core archive table.
-# tg_message_id is Telegram's ID, which is only unique within a single chat,
-# so the uniqueness constraint is on the (tg_message_id, chat_id) pair.
+# tg_message_id is Telegram's ID, which is only unique within a single chat, so the uniqueness constraint is on the (tg_message_id, chat_id) pair.
 # sender_id is NULL for channel posts (no individual author).
-# archived_at records when TeleVault stored the row, distinct from date
-# (when Telegram says the message was sent).
+# archived_at records when TeleVault stored the row, distinct from date (when Telegram says the message was sent).
 _CREATE_MESSAGES = """
 CREATE TABLE IF NOT EXISTS messages (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -87,9 +82,8 @@ CREATE TABLE IF NOT EXISTS messages (
 """
 
 # A compound unique index on (tg_message_id, chat_id) is critical.
-# Telegram reuses message IDs across different chats, so tg_message_id alone
-# is not unique globally. This index also speeds up deletion lookups, where
-# the app receives a (message_id, chat_id) pair and need to find the right row fast.
+# Telegram reuses message IDs across different chats, so tg_message_id alone is not unique globally.
+# This index also speeds up deletion lookups, where the app receives a (message_id, chat_id) pair and need to find the right row fast.
 _CREATE_MESSAGES_INDEX = """
 CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_tg_id_chat ON messages(tg_message_id, chat_id);
 """
@@ -114,10 +108,8 @@ CREATE INDEX IF NOT EXISTS idx_message_edits_message_id ON message_edits(message
 """
 
 # Mirrors message_edits but for deletions.
-# Stores a snapshot of the text at deletion time so the record is
-# self-contained - useful even if messages.text is later modified.
-# deleted_at is passed explicitly from Python (local time) rather than
-# relying on SQLite's DEFAULT CURRENT_TIMESTAMP, which is always UTC.
+# Stores a snapshot of the text at deletion time so the record is self-contained - useful even if messages.text is later modified.
+# deleted_at is passed explicitly from Python (local time) rather than relying on SQLite's DEFAULT CURRENT_TIMESTAMP, which is always UTC.
 _CREATE_MESSAGE_DELETIONS = """
 CREATE TABLE IF NOT EXISTS message_deletions (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -149,10 +141,9 @@ def _clean(sql: str) -> str:
     """
     Strip stray carriage returns before passing SQL to SQLite.
  
-    On Windows, Python source files checked out via Git often contain CRLF
-    line endings, which means triple-quoted string literals contain \\r\\n.
-    SQLite's parser can stumble on the bare \\r character inside DDL, producing
-    misleading 'near ): syntax error' messages. Stripping \\r is always safe.
+    On Windows, Python source files checked out via Git often contain CRLF line endings, which means triple-quoted string literals contain \\r\\n.
+    SQLite's parser can stumble on the bare \\r character inside DDL, producing misleading 'near ): syntax error' messages.
+    Stripping \\r is always safe.
     """
     return sql.replace("\r\n", "\n").replace("\r", "\n")
 
@@ -167,10 +158,9 @@ def apply_schema(conn: sqlite3.Connection) -> None:
     Safe to call on every startup
 
     Each statement is executed individually and committed immediately.
-    Wrapping DDL in a transaction context manager (with conn:) can cause
-    failures on Python 3.12+ where the context manager starts an explicit
-    transaction - SQLite has constraints on DDL inside certain transaction
-    states. Explicit per-statement commits sidestep this entirely.
+    Wrapping DDL in a transaction context manager (with conn:) can cause failures on Python 3.12+ where the context manager starts an explicit transaction
+    - SQLite has constraints on DDL inside certain transaction states.
+    Explicit per-statement commits sidestep this entirely.
     """
     for label, sql in _STATEMENTS:
         cleaned = _clean(sql)
@@ -179,12 +169,13 @@ def apply_schema(conn: sqlite3.Connection) -> None:
             conn.execute(cleaned)
             conn.commit()
         except sqlite3.OperationalError as exc:
-            # Re-raise with context: which statement failed and its exact SQL,
-            # so the error message is actionable rather than just a line number.
+            # Re-raise with context: which statement failed and its exact SQL, so the error message is actionable rather than just a line number.
             raise sqlite3.OperationalError(
                 f"Schema error while applying '{label}'.\n"
                 f"SQL attempted:\n{cleaned}\n"
                 f"Original error: {exc}"
             ) from exc
     
+    from db.migrations import run_all
+    run_all(conn)
     logger.info("Schema applied successfully.")
