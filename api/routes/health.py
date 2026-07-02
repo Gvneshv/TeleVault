@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends
 
 from api.dependencies import get_db
 from api.schemas import HealthOut
-from config import Settings
+from config import settings
 
 router = APIRouter(tags=["health"])
 
@@ -33,8 +33,6 @@ def health_check(db: sqlite3.Connection = Depends(get_db)) -> HealthOut:
     A 200 response is always returned — the caller reads the body to determine actual health, rather than relying on HTTP status codes.
     This makes it easier to display partial-health states in the UI.
     """
-    settings = Settings()
-
     # Check 1: can we read from the database?
     try:
         from db.read_queries import get_message_count

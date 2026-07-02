@@ -19,7 +19,7 @@ from typing import Generator
 
 from fastapi import HTTPException
 
-from config import Settings
+from config import settings
 
 
 def get_db() -> Generator[sqlite3.Connection, None, None]:
@@ -37,7 +37,6 @@ def get_db() -> Generator[sqlite3.Connection, None, None]:
     Raises:
         HTTPException 503 if the database file cannot be opened (e.g. the file doesn't exist yet because the userbot has never run).
     """
-    settings = Settings()
     db_path = Path(settings.db_path).resolve()
 
     # SQLite URI mode: mode=ro refuses writes at the driver level.
