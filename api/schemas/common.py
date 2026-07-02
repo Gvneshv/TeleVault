@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 T = TypeVar("T")
 
 
-class PaginatedResponse(BaseModel):
+class PaginatedResponse(BaseModel, Generic[T]):
     """
     Generic pagination envelope returned by all list endpoints.
  
