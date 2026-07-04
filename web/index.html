@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TeleVault</title>
+  <meta name="theme-color" content="#14181d" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+
+  <!-- Fonts: display (wordmark/headers only), UI, and mono (timestamps/IDs). -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
+    rel="stylesheet"
+  />
+
+  <link rel="stylesheet" href="/css/variables.css" />
+  <link rel="stylesheet" href="/css/base.css" />
+
+  <!-- Theme applies before first paint to avoid a flash of the wrong theme. -->
+  <script src="/js/theme.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <nav class="app-nav" aria-label="Main navigation">
+      <div class="app-nav__wordmark" data-i18n="app.wordmark">TeleVault</div>
+
+      <ul class="app-nav__list">
+        <li><button class="app-nav__link" data-view="chats" aria-current="page">
+          <span data-i18n="nav.chats">Chats</span>
+        </button></li>
+        <li><button class="app-nav__link" data-view="messages">
+          <span data-i18n="nav.messages">Messages</span>
+        </button></li>
+        <li><button class="app-nav__link" data-view="deleted">
+          <span data-i18n="nav.deleted">Deleted</span>
+        </button></li>
+        <li><button class="app-nav__link" data-view="stats">
+          <span data-i18n="nav.stats">Stats</span>
+        </button></li>
+        <li><button class="app-nav__link" data-view="health">
+          <span data-i18n="nav.health">Health</span>
+        </button></li>
+      </ul>
+
+      <div class="app-nav__spacer"></div>
+
+      <div class="app-nav__controls">
+        <button id="theme-toggle" data-i18n-aria-label="theme.toggleLabel" aria-label="Toggle theme">☀</button>
+        <select id="lang-select" data-i18n-aria-label="lang.selectLabel" aria-label="Language">
+          <option value="en">EN</option>
+          <option value="uk">UK</option>
+        </select>
+      </div>
+    </nav>
+
+    <main class="app-main">
+      <section class="app-view" data-view="chats">
+        <h1 data-i18n="nav.chats">Chats</h1>
+        <div class="empty-state" data-i18n="common.comingSoon">This view isn't built yet.</div>
+      </section>
+
+      <section class="app-view" data-view="messages" hidden>
+        <h1 data-i18n="nav.messages">Messages</h1>
+        <div class="empty-state" data-i18n="common.comingSoon">This view isn't built yet.</div>
+      </section>
+
+      <section class="app-view" data-view="deleted" hidden>
+        <h1 data-i18n="nav.deleted">Deleted</h1>
+        <div class="empty-state" data-i18n="common.comingSoon">This view isn't built yet.</div>
+      </section>
+
+      <section class="app-view" data-view="stats" hidden>
+        <h1 data-i18n="nav.stats">Stats</h1>
+        <div class="empty-state" data-i18n="common.comingSoon">This view isn't built yet.</div>
+      </section>
+
+      <section class="app-view" data-view="health" hidden>
+        <h1 data-i18n="nav.health">Health</h1>
+        <div class="empty-state" data-i18n="common.comingSoon">This view isn't built yet.</div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/js/i18n/en.js"></script>
+  <script src="/js/i18n/uk.js"></script>
+  <script src="/js/i18n.js"></script>
+  <script src="/js/app.js"></script>
+
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("/sw.js").catch(() => {
+          // Registration failure shouldn't block the app — TeleVault works fine without offline support, it just loses it.
+        });
+      });
+    }
+  </script>
+</body>
+</html>

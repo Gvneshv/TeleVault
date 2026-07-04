@@ -1,0 +1,60 @@
+/*
+ * Design tokens for TeleVault.
+ *
+ * Palette concept: "archive paper" (light) / "vault steel" (dark).
+ * The accent colors are deliberately tied to the product's subject matter:
+ *   --color-seal    : oxblood wax-seal red, used ONLY for deleted/preserved messages — a literal callback to sealing a preserved document.
+ *                     Do not reuse this color for anything else;
+ *                      its meaning ("this was deleted, we kept it") should stay unambiguous throughout the UI.
+ *   --color-patina  : verdigris (aged copper), used for edited messages.
+ *
+ * Values are set per data-theme attribute on <html>, toggled by js/theme.js and persisted to localStorage.
+ * No third theme is planned;
+ * if one is added later, keep the accent semantics (seal = deleted, patina = edited) consistent across all themes.
+ */
+
+:root[data-theme="light"] {
+  --color-bg: #eceae2;
+  --color-bg-panel: #f7f6f1;
+  --color-bg-raised: #ffffff;
+  --color-ink: #1c2024;
+  --color-ink-muted: #5b6169;
+  --color-border: #d3d2c7;
+  --color-seal: #7a2e2e;
+  --color-seal-bg: #f0e2df;
+  --color-patina: #3f6c60;
+  --color-patina-bg: #e3ede9;
+  --color-focus: #2d5f8a;
+  --color-shadow: rgba(28, 32, 36, 0.08);
+}
+
+:root[data-theme="dark"] {
+  --color-bg: #14181d;
+  --color-bg-panel: #1b2027;
+  --color-bg-raised: #222833;
+  --color-ink: #e7e5dd;
+  --color-ink-muted: #8b9199;
+  --color-border: #2b323b;
+  --color-seal: #c6614f;
+  --color-seal-bg: #3a2422;
+  --color-patina: #6fa696;
+  --color-patina-bg: #1f2e2a;
+  --color-focus: #6fa8dc;
+  --color-shadow: rgba(0, 0, 0, 0.35);
+}
+
+:root {
+  /* Typography roles — see base.css for usage.
+     display : wordmark and section headers only, used with restraint.
+     ui      : all interface text, chosen for density and legibility.
+     mono    : timestamps, message/chat IDs, anything ledger-like. */
+  --font-display: "Fraunces", Georgia, serif;
+  --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+
+  --nav-width: 220px;
+  --transition-theme: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
