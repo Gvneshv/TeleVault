@@ -21,6 +21,18 @@ window.TELEVAULT_I18N.en = {
   "common.loading": "Loading…",
   "common.error": "Something went wrong.",
 
+  "chats.empty": "No chats archived yet.",
+  "chats.noPreview": "No messages yet",
+  "chats.messagesLabel": "messages",
+  "chats.deletedLabel": "deleted",
+  "chats.pageOf": "Page {page} of {pages}",
+  "chats.prev": "Previous",
+  "chats.next": "Next",
+  "chats.type.private": "Private",
+  "chats.type.group": "Group",
+  "chats.type.supergroup": "Supergroup",
+  "chats.type.channel": "Channel",
+
   "theme.toggleLabel": "Toggle theme",
   "lang.selectLabel": "Language",
 };

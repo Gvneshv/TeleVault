@@ -17,6 +17,18 @@ window.TELEVAULT_I18N.uk = {
   "common.loading": "Завантаження…",
   "common.error": "Щось пішло не так.",
 
+  "chats.empty": "Ще немає архівованих чатів.",
+  "chats.noPreview": "Повідомлень ще немає",
+  "chats.messagesLabel": "повідомлень",
+  "chats.deletedLabel": "видалено",
+  "chats.pageOf": "Сторінка {page} з {pages}",
+  "chats.prev": "Назад",
+  "chats.next": "Далі",
+  "chats.type.private": "Приватний",
+  "chats.type.group": "Група",
+  "chats.type.supergroup": "Супергрупа",
+  "chats.type.channel": "Канал",
+
   "theme.toggleLabel": "Змінити тему",
   "lang.selectLabel": "Мова",
 };
