@@ -316,7 +316,8 @@ input:focus-visible {
 
 /* The seal-badge's signature tilt (see variables.css) works well as an isolated accent,
    but here several badges of varying width (count text differs per chat) stack in a column.
-   A fixed rotation angle shifts wider badges higher than narrower ones — see chat above with dev tools open — which reads as misalignment rather than character.Disabled in this context only;
+   A fixed rotation angle shifts wider badges higher than narrower ones — see chat above with dev tools open — which reads as misalignment rather than character.
+   Disabled in this context only;
    the tilt stays everywhere else it's used in isolation. */
 .chat-row__stats .seal-badge {
   transform: none;
@@ -445,6 +446,15 @@ input:focus-visible {
 .message-row__text--empty {
   color: var(--color-ink-muted);
   font-style: italic;
+}
+
+/* Search-term highlight — see highlightMatches() in js/views/messages.js.
+   Scoped to message text only; color is left inherited (works in both themes against --color-highlight-bg without a paired ink token). */
+.message-row__text mark {
+  background: var(--color-highlight-bg);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
 }
 
 /* Filter bar stacks on narrow viewports, same breakpoint as the rest of the app. */

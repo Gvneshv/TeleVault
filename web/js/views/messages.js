@@ -7,6 +7,8 @@
  * they live in the separate Deleted tab by design (see api/routes/deleted.py).
  *
  * Filters supported now: free-text search (q) and an "edited only" toggle.
+ * Matches from `q` are highlighted inline within message text via highlightMatches() below,
+ * using the --color-highlight-bg token (see variables.css) — separate from the seal/patina tokens, which stay reserved for deleted/edited semantics.
  * chat_id/sender_id/date_from/date_to are in the API already but have no UI here yet — there's no per-chat or per-sender entry point to populate them from.
  * Wiring chat_id is a small addition once chat rows become clickable (see the `data-chat-id` note in chats.js).
  *
@@ -67,6 +69,28 @@ function formatMessageTimestamp(iso) {
 }
 
 /**
+ * Wrap occurrences of `query` in <mark> tags within already-HTML-escaped text.
+ *
+ * Must be called AFTER escapeHtml(), not before — operating on escaped text means the regex only ever matches plain characters, never HTML markup,
+ * so there's no risk of matching inside a tag or breaking the escaping.
+ *
+ * The query itself is escaped for regex special characters (e.g. searching literally for "a.b" or "(hi)" must not be treated as a regex pattern).
+ *
+ * One known limitation: if the query contains a character that escapeHtml() converts to an entity (e.g. searching for "<"),
+ * it won't match the escaped "&lt;" in the text. Edge case, not worth the complexity of a smarter match against un-escaped positions for a personal archive tool.
+ *
+ * @param {string} escapedText - text that has already been through escapeHtml().
+ * @param {string} query - raw (unescaped) search query.
+ * @returns {string}
+ */
+function highlightMatches(escapedText, query) {
+  if (!query) return escapedText;
+  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(`(${escapedQuery})`, "gi");
+  return escapedText.replace(regex, "<mark>$1</mark>");
+}
+
+/**
  * Render one message row as an HTML string.
  * @param {object} msg - a MessageOut record from the API.
  * @returns {string}
@@ -87,7 +111,7 @@ function renderMessageRow(msg) {
     : "";
 
   const text = msg.text
-    ? escapeHtml(msg.text)
+    ? highlightMatches(escapeHtml(msg.text), messagesViewState.q)
     : `<span class="message-row__text--empty">${t("messages.noText")}</span>`;
 
   return `

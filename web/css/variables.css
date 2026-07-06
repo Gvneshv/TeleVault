@@ -5,8 +5,10 @@
  * The accent colors are deliberately tied to the product's subject matter:
  *   --color-seal    : oxblood wax-seal red, used ONLY for deleted/preserved messages — a literal callback to sealing a preserved document.
  *                     Do not reuse this color for anything else;
- *                      its meaning ("this was deleted, we kept it") should stay unambiguous throughout the UI.
+ *                     its meaning ("this was deleted, we kept it") should stay unambiguous throughout the UI.
  *   --color-patina  : verdigris (aged copper), used for edited messages.
+ *   --color-highlight-bg : warm highlighter-gold, used ONLY to mark search-term matches inside message text (Messages view).
+ *                          Text color is left inherited rather than a paired token — the background alone provides enough contrast against --color-ink in both themes.
  *
  * Values are set per data-theme attribute on <html>, toggled by js/theme.js and persisted to localStorage.
  * No third theme is planned;
@@ -26,6 +28,7 @@
   --color-patina-bg: #e3ede9;
   --color-focus: #2d5f8a;
   --color-shadow: rgba(28, 32, 36, 0.08);
+  --color-highlight-bg: #f0cf6b;
 }
 
 :root[data-theme="dark"] {
@@ -41,6 +44,7 @@
   --color-patina-bg: #1f2e2a;
   --color-focus: #6fa8dc;
   --color-shadow: rgba(0, 0, 0, 0.35);
+  --color-highlight-bg: #5c4a1a;
 }
 
 :root {
