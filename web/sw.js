@@ -10,10 +10,11 @@
  * Bump CACHE_NAME whenever shell files change, so old caches are evicted on the next visit instead of silently serving outdated JS/CSS.
  */
 
-const CACHE_NAME = "televault-shell-v2";
+const CACHE_NAME = "televault-shell-v3";
 const SHELL_FILES = [
   "/",
   "/index.html",
+  "/favicon.ico",
   "/css/variables.css",
   "/css/base.css",
   "/js/theme.js",

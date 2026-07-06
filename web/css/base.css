@@ -186,7 +186,7 @@ input:focus-visible {
   border-radius: 999px;
   background: var(--color-seal-bg);
   color: var(--color-seal);
-  transform: rotate(-1.5deg);
+  /*transform: rotate(-1.5deg);*/
 }
 
 .seal-badge::before {
@@ -312,6 +312,15 @@ input:focus-visible {
   font-family: var(--font-mono);
   font-size: 11.5px;
   color: var(--color-ink-muted);
+}
+
+/* The seal-badge's signature tilt (see variables.css) works well as an isolated accent,
+   but here several badges of varying width (count text differs per chat) stack in a column.
+   A fixed rotation angle shifts wider badges higher than narrower ones — see chat above with dev tools open — which reads as misalignment rather than character.
+   Disabled in this context only;
+   the tilt stays everywhere else it's used in isolation. */
+.chat-row__stats .seal-badge {
+  transform: none;
 }
 
 .chat-pagination {
