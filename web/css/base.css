@@ -316,14 +316,19 @@ input:focus-visible {
 
 /* The seal-badge's signature tilt (see variables.css) works well as an isolated accent,
    but here several badges of varying width (count text differs per chat) stack in a column.
-   A fixed rotation angle shifts wider badges higher than narrower ones — see chat above with dev tools open — which reads as misalignment rather than character.
-   Disabled in this context only;
+   A fixed rotation angle shifts wider badges higher than narrower ones — see chat above with dev tools open — which reads as misalignment rather than character.Disabled in this context only;
    the tilt stays everywhere else it's used in isolation. */
 .chat-row__stats .seal-badge {
   transform: none;
 }
 
-.chat-pagination {
+/* ---------------------------------------------------------------------
+   Pagination — shared across every paginated view (Chats, Messages, ...).
+   Was chat-pagination*;
+   renamed once a second view needed it verbatim.
+   ------------------------------------------------------------------- */
+
+.pagination {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -331,19 +336,19 @@ input:focus-visible {
   padding: 20px 0;
 }
 
-.chat-pagination__btn {
+.pagination__btn {
   padding: 6px 14px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
   background: var(--color-bg-raised);
 }
 
-.chat-pagination__btn:disabled {
+.pagination__btn:disabled {
   opacity: 0.4;
   cursor: default;
 }
 
-.chat-pagination__info {
+.pagination__info {
   font-family: var(--font-mono);
   font-size: 12.5px;
   color: var(--color-ink-muted);
@@ -360,6 +365,98 @@ input:focus-visible {
     align-items: center;
     width: 100%;
     padding-left: 50px;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   Messages view
+   ------------------------------------------------------------------- */
+
+.messages-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.messages-filter__search {
+  flex: 1;
+  max-width: 360px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-raised);
+}
+
+.messages-filter__toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--color-ink-muted);
+  white-space: nowrap;
+}
+
+.message-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.message-row {
+  padding: 12px 8px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.message-row:first-child {
+  border-top: 1px solid var(--color-border);
+}
+
+.message-row__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 4px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-ink-muted);
+}
+
+.message-row__sender {
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.message-row__chat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.message-row__text {
+  font-size: 13.5px;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.message-row__text--empty {
+  color: var(--color-ink-muted);
+  font-style: italic;
+}
+
+/* Filter bar stacks on narrow viewports, same breakpoint as the rest of the app. */
+@media (max-width: 640px) {
+  .messages-filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .messages-filter__search {
+    max-width: none;
   }
 }
 

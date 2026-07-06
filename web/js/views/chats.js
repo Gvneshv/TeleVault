@@ -4,12 +4,14 @@
  * Fetches GET /api/chats (paginated) and renders each chat as a row: name, chat-type badge, message/deleted counts, and a preview of the most recent message.
  * This is the landing view, so it self-initializes on DOMContentLoaded rather than waiting for a nav click.
  *
+ * Depends on js/lib/dom.js (escapeHtml) and js/lib/pagination.js (render/attach) — see index.html for load order.
+ *
  * Scope, deliberately: list + pagination only.
  * Clicking a row does nothing yet — there's no single-chat or filtered-messages view to send it to.
- * Each row still carries `data-chat-id` so that wiring is a one-line addition once the Messages view exists, instead of a re-render change here.
+ * Each row still carries `data-chat-id` so that wiring is a one-line addition once a per-chat view exists, instead of a re-render change here.
  *
  * State is kept minimal and re-fetched fresh on every page change;
- * nothing is cached client-side.
+ * nothing is cached client-side beyond the last page (see lastData below, kept only for language-switch re-rendering).
  * This is a personal single-user archive, not a high-traffic API,
  * so the extra request per page turn is not a real cost — and it keeps this file free of cache-invalidation logic it doesn't need yet.
  */
@@ -66,7 +68,8 @@ function chatInitials(name) {
  */
 function renderChatRow(chat) {
   const t = window.TeleVaultI18n.t;
-  const typeKey = `chats.type.${chat.chat_type}`;
+  const escapeHtml = window.TeleVaultDom.escapeHtml;
+  const typeKey = `common.type.${chat.chat_type}`;
   const typeLabel = chat.chat_type ? t(typeKey) : "";
 
   const deletedBadge =
@@ -98,41 +101,6 @@ function renderChatRow(chat) {
 }
 
 /**
- * Minimal HTML-escaping for user/Telegram-supplied text (chat names, message previews) before it's inserted via innerHTML.
- * Message text originates from Telegram, not from this app, so it must never be trusted as-is.
- *
- * @param {string} str
- * @returns {string}
- */
-function escapeHtml(str) {
-  const div = document.createElement("div");
-  div.textContent = str;
-  return div.innerHTML;
-}
-
-/** Render the pagination controls for the current page/total. */
-function renderPagination(total, page, perPage, pages) {
-  const t = window.TeleVaultI18n.t;
-  if (pages <= 1) return "";
-
-  const pageOfText = t("chats.pageOf")
-    .replace("{page}", String(page))
-    .replace("{pages}", String(pages));
-
-  return `
-    <div class="chat-pagination">
-      <button class="chat-pagination__btn" data-page-action="prev" ${page <= 1 ? "disabled" : ""}>
-        ${t("chats.prev")}
-      </button>
-      <span class="chat-pagination__info">${pageOfText}</span>
-      <button class="chat-pagination__btn" data-page-action="next" ${page >= pages ? "disabled" : ""}>
-        ${t("chats.next")}
-      </button>
-    </div>
-  `;
-}
-
-/**
  * Render the view's current state (rows + pagination) from already-fetched data.
  * Pulled out of loadChats() so a language change can call this again with the cached page instead of hitting the API a second time.
  *
@@ -148,10 +116,8 @@ function renderChatsView(root, data) {
   }
 
   const rowsHtml = data.items.map(renderChatRow).join("");
-  const paginationHtml = renderPagination(
-    data.total,
+  const paginationHtml = window.TeleVaultPagination.render(
     data.page,
-    data.per_page,
     data.pages,
   );
 
@@ -160,11 +126,9 @@ function renderChatsView(root, data) {
     ${paginationHtml}
   `;
 
-  root.querySelectorAll("[data-page-action]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      chatsViewState.page += btn.dataset.pageAction === "next" ? 1 : -1;
-      loadChats(root);
-    });
+  window.TeleVaultPagination.attach(root, (delta) => {
+    chatsViewState.page += delta;
+    loadChats(root);
   });
 }
 

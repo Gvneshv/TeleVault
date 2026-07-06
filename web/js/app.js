@@ -26,6 +26,12 @@ document.addEventListener("DOMContentLoaded", () => {
         link.removeAttribute("aria-current");
       }
     });
+
+    // Views other than the landing "chats" tab don't self-initialize on DOMContentLoaded (no point fetching data for a hidden tab).
+    // Each such view exposes a window.TeleVault<View>View.init() that's safe to call more than once — the view itself guards against re-initializing.
+    if (viewName === "messages" && window.TeleVaultMessagesView) {
+      window.TeleVaultMessagesView.init();
+    }
   }
 
   links.forEach((link) => {

@@ -65,7 +65,9 @@
 
       <section class="app-view" data-view="messages" hidden>
         <h1 data-i18n="nav.messages">Messages</h1>
-        <div class="empty-state" data-i18n="common.comingSoon">This view isn't built yet.</div>
+        <div id="messages-filter-bar" class="messages-filter-bar"></div>
+        <!-- Populated by js/views/messages.js -->
+        <div id="messages-root"></div>
       </section>
 
       <section class="app-view" data-view="deleted" hidden>
@@ -88,8 +90,11 @@
   <script src="/js/i18n/en.js"></script>
   <script src="/js/i18n/uk.js"></script>
   <script src="/js/i18n.js"></script>
+  <script src="/js/lib/dom.js"></script>
+  <script src="/js/lib/pagination.js"></script>
   <script src="/js/app.js"></script>
   <script src="/js/views/chats.js"></script>
+  <script src="/js/views/messages.js"></script>
 
   <script>
     if ("serviceWorker" in navigator) {
