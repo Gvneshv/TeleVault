@@ -87,7 +87,7 @@ function renderChatRow(chat) {
       <div class="chat-row__body">
         <div class="chat-row__top">
           <span class="chat-row__name">${escapeHtml(chat.name ?? String(chat.chat_id))}</span>
-          ${typeLabel ? `<span class="chat-type-badge">${typeLabel}</span>` : ""}
+          ${typeLabel ? `<span class="info-badge">${typeLabel}</span>` : ""}
         </div>
         <div class="chat-row__preview">${preview}</div>
       </div>

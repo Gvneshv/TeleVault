@@ -20,4 +20,29 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-window.TeleVaultDom = { escapeHtml };
+/**
+ * Wrap occurrences of `query` in <mark> tags within already-HTML-escaped text.
+ *
+ * Must be called AFTER escapeHtml(), not before — operating on escaped text means the regex only ever matches plain characters,
+ * never HTML markup, so there's no risk of matching inside a tag or breaking the escaping.
+ *
+ * The query itself is escaped for regex special characters (e.g. searching literally for "a.b" or "(hi)" must not be treated as a regex pattern).
+ *
+ * Shared by the Messages and Deleted views — both let the user search message text and want the match visible in results.
+ *
+ * One known limitation: if the query contains a character escapeHtml() converts to an entity (e.g. searching for "<"),
+ * it won't match the escaped "&lt;" in the text.
+ * Edge case, not worth the complexity of matching against un-escaped positions for a personal archive tool.
+ *
+ * @param {string} escapedText - text that has already been through escapeHtml().
+ * @param {string} query - raw (unescaped) search query.
+ * @returns {string}
+ */
+function highlightMatches(escapedText, query) {
+  if (!query) return escapedText;
+  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(`(${escapedQuery})`, "gi");
+  return escapedText.replace(regex, "<mark>$1</mark>");
+}
+
+window.TeleVaultDom = { escapeHtml, highlightMatches };
