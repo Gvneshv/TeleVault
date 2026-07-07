@@ -243,6 +243,20 @@ def insert_message(
     return row_id
 
 
+def _get_chat_type(conn: sqlite3.Connection, chat_id: int) -> str | None:
+    """
+    Look up a chat's stored type ('private', 'group', 'supergroup', 'channel').
+
+    Internal helper for flag_deleted()'s channel-admin inference below — not exported for API use (api/db/read_queries.py has its own get_chat() for that,
+    with a different return shape).
+    Returns None if the chat isn't in the DB yet, which shouldn't normally happen for a chat_id that already has a message in it, but isn't assumed.
+    """
+    row = conn.execute(
+        "SELECT chat_type FROM chats WHERE chat_id = ?", (chat_id,)
+    ).fetchone()
+    return row["chat_type"] if row else None
+
+
 def flag_deleted(
     conn: sqlite3.Connection, 
     tg_message_id: int, 
@@ -253,6 +267,19 @@ def flag_deleted(
     Mark a message as deleted and record a deletion snapshot.
  
     The snapshot (text at time of deletion) is written to message_deletions atomically with the flag update - both succeed or both roll back.
+
+    Actor inference (deleted_by_inference):
+    computed ONLY for broadcast channels, where it's a structural fact rather than a guess — regular channel subscribers cannot delete posts at all,
+    only admins can (or the original poster, if they're an admin).
+    Deliberately NOT attempted for private chats, groups, or supergroups:
+    Telegram allows any party to delete a message for everyone with no time limit and no record of who did it,
+    so a sender_id-based guess there would be closer to a coin flip than a signal.
+    See api/schemas/message.py's DeletionOut docstring for the full reasoning.
+    Every other chat type gets 'unknown', which is the column's own DEFAULT — nothing to set explicitly for those.
+
+    Note the distinction from "did this deletion event carry a chat_id" — Telegram's updateDeleteChannelMessages fires for supergroups too,
+    not just channels (see handlers/on_delete.py's docstring), and supergroups behave like ordinary groups for deletion permissions.
+    So chat_type is checked explicitly here rather than inferred from which code path called this function.
  
     Returns True if the row was found and flagged, False if the message wasn't in the DB (may have been sent before TeleVault was running).
     """
@@ -264,15 +291,28 @@ def flag_deleted(
             f"Deletion event for message {tg_message_id} in chat {chat_id} - not found in DB or already flagged (possibly sent before TeleVault was running)."
         )
         return False
-    
+
+    deleted_by_inference = "unknown"
+    inference_confidence = None
+    if _get_chat_type(conn, chat_id) == "channel":
+        deleted_by_inference = "channel_admin"
+        inference_confidence = (
+            "Only a channel admin can delete a channel post - regular "
+            "subscribers cannot delete posts, including their own."
+        )
+
     try:
         conn.execute(
             "UPDATE messages SET is_deleted = 1, deleted_at = ? WHERE id = ?",
             (ts, row["id"]),
         )
         conn.execute(
-            "INSERT INTO message_deletions (message_id, text_snapshot, deleted_at) VALUES (?, ?, ?)",
-            (row["id"], row["text"], ts),
+            """
+            INSERT INTO message_deletions
+                (message_id, text_snapshot, deleted_at, deleted_by_inference, inference_confidence)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (row["id"], row["text"], ts, deleted_by_inference, inference_confidence),
         )
         _commit(conn)
     except Exception:
