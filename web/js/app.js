@@ -35,6 +35,12 @@ document.addEventListener("DOMContentLoaded", () => {
     if (viewName === "deleted" && window.TeleVaultDeletedView) {
       window.TeleVaultDeletedView.init();
     }
+    if (viewName === "stats" && window.TeleVaultStatsView) {
+      window.TeleVaultStatsView.init();
+    }
+    if (viewName === "health" && window.TeleVaultHealthView) {
+      window.TeleVaultHealthView.init();
+    }
   }
 
   links.forEach((link) => {
