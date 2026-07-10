@@ -64,25 +64,33 @@ class EditOut(BaseModel):
 
 
 # Inference values for who deleted a message.
-# Implemented for channels only (see db/queries.py's flag_deleted()):
-# broadcast channels restrict deletion to admins, so it's a structural fact, not a guess.
-# Deliberately NOT implemented for private/group/supergroup chats — Telegram allows any party to delete a message for everyone with no time limit and no record of who did it,
-# so a sender_id/timing guess there would be closer to a coin flip than a signal.
+# Implemented for two cases where it's a structural fact rather than a guess (see db/queries.py's flag_deleted()):
+#   - 'channel_admin': broadcast channels restrict deletion to admins
+#   - 'self': Saved Messages (chat_id == the archiving account's own Telegram user ID) — only the account owner has access to it at all
+# Deliberately NOT implemented for ordinary private/group/supergroup chats — Telegram allows any party to delete a message for everyone with no time
+# limit and no record of who did it, so a sender_id/timing guess there would be closer to a coin flip than a signal.
 # Those always get 'unknown', which is also the column's own DEFAULT.
-DeletionActorInference = Literal["channel_admin", "unknown"]
+DeletionActorInference = Literal["channel_admin", "self", "unknown"]
 
 
 class DeletionOut(BaseModel):
     """
     Deletion record for a message, embedded in MessageDetail.
 
-    `deleted_by_inference` is 'channel_admin' when the message came from a broadcast channel (only admins can delete channel posts — see DeletionActorInference above), and 'unknown' for every other chat type,
-    where TeleVault deliberately does not attempt a guess.
-    This is not a partial implementation waiting to be finished — it's the intended final state;
-    a private/group guess was considered and rejected as unreliable.
+    `deleted_by_inference` is:
+      - 'channel_admin' for messages from a broadcast channel (only admins
+        can delete channel posts)
+      - 'self' for messages from Saved Messages (only the account owner has
+        access to it — no ambiguity, unlike an ordinary private chat)
+      - 'unknown' for every other chat type, where TeleVault deliberately
+        does not attempt a guess
+    This is not a partial implementation waiting to be finished for the
+    'unknown' cases — it's the intended final state; a private/group guess
+    was considered and rejected as unreliable.
 
-    `inference_confidence` gives a short, fixed, human-readable note explaining the 'channel_admin' inference's basis.
-    Currently always null for 'unknown' rows, since there's nothing to explain about not guessing.
+    `inference_confidence` gives a short, fixed, human-readable note
+    explaining the 'channel_admin'/'self' inference's basis. Always null
+    for 'unknown' rows, since there's nothing to explain about not guessing.
     """
 
     id: int
@@ -91,7 +99,7 @@ class DeletionOut(BaseModel):
     deleted_by_inference: DeletionActorInference = "unknown"
     inference_confidence: str | None = Field(
         None,
-        description="Fixed explanatory note for the 'channel_admin' inference. Null for 'unknown' rows."
+        description="Fixed explanatory note for the 'channel_admin'/'self' inference. Null for 'unknown' rows."
     )
 
     model_config = {"from_attributes": True}

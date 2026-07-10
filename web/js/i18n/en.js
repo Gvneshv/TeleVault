@@ -45,6 +45,7 @@ window.TELEVAULT_I18N.en = {
   "deleted.hideDetails": "Hide details",
   "deleted.noRecord": "No deletion record found.",
   "deleted.actor.channel_admin": "Deleted by a channel admin",
+  "deleted.actor.self": "Deleted by you",
   "deleted.actor.unknown": "Deleted by — unknown",
 
   "stats.totalMessages": "Total messages",

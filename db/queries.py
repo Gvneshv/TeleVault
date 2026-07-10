@@ -247,8 +247,8 @@ def _get_chat_type(conn: sqlite3.Connection, chat_id: int) -> str | None:
     """
     Look up a chat's stored type ('private', 'group', 'supergroup', 'channel').
 
-    Internal helper for flag_deleted()'s channel-admin inference below — not exported for API use (api/db/read_queries.py has its own get_chat() for that,
-    with a different return shape).
+    Internal helper for flag_deleted()'s channel-admin inference below — not exported for API use
+    (api/db/read_queries.py has its own get_chat() for that, with a different return shape).
     Returns None if the chat isn't in the DB yet, which shouldn't normally happen for a chat_id that already has a message in it, but isn't assumed.
     """
     row = conn.execute(
@@ -261,7 +261,8 @@ def flag_deleted(
     conn: sqlite3.Connection, 
     tg_message_id: int, 
     chat_id: int, 
-    deleted_at: datetime | None = None
+    deleted_at: datetime | None = None,
+    self_id: int | None = None,
 ) -> bool:
     """
     Mark a message as deleted and record a deletion snapshot.
@@ -269,13 +270,19 @@ def flag_deleted(
     The snapshot (text at time of deletion) is written to message_deletions atomically with the flag update - both succeed or both roll back.
 
     Actor inference (deleted_by_inference):
-    computed ONLY for broadcast channels, where it's a structural fact rather than a guess — regular channel subscribers cannot delete posts at all,
-    only admins can (or the original poster, if they're an admin).
-    Deliberately NOT attempted for private chats, groups, or supergroups:
+    computed for two cases where it's a structural fact rather than a guess, everything else stays 'unknown' (the column's own DEFAULT):
+
+      - Broadcast channels: only admins can delete channel posts, so any deletion there is 'channel_admin'.
+      - Saved Messages (chat_id == self_id, the archiving account's own Telegram user ID):
+        only the account owner has access to their own Saved Messages — no one else can even see it, let alone delete from it — so any deletion there is 'self'.
+
+    Deliberately NOT attempted for ordinary private chats, groups, or supergroups:
     Telegram allows any party to delete a message for everyone with no time limit and no record of who did it,
     so a sender_id-based guess there would be closer to a coin flip than a signal.
     See api/schemas/message.py's DeletionOut docstring for the full reasoning.
-    Every other chat type gets 'unknown', which is the column's own DEFAULT — nothing to set explicitly for those.
+
+    self_id is optional (defaults to None) so existing callers/tests that don't have it handy still work — Saved Messages just won't be detected without it,
+    falling back to 'unknown' same as any other private chat.
 
     Note the distinction from "did this deletion event carry a chat_id" — Telegram's updateDeleteChannelMessages fires for supergroups too,
     not just channels (see handlers/on_delete.py's docstring), and supergroups behave like ordinary groups for deletion permissions.
@@ -299,6 +306,11 @@ def flag_deleted(
         inference_confidence = (
             "Only a channel admin can delete a channel post - regular "
             "subscribers cannot delete posts, including their own."
+        )
+    elif self_id is not None and chat_id == self_id:
+        deleted_by_inference = "self"
+        inference_confidence = (
+            "Saved Messages is only accessible to you - no one else can see it, let alone delete from it."
         )
 
     try:

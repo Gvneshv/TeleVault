@@ -41,6 +41,7 @@ window.TELEVAULT_I18N.uk = {
   "deleted.hideDetails": "Сховати деталі",
   "deleted.noRecord": "Запис про видалення не знайдено.",
   "deleted.actor.channel_admin": "Видалено адміністратором каналу",
+  "deleted.actor.self": "Видалили ви",
   "deleted.actor.unknown": "Хто видалив — невідомо",
 
   "stats.totalMessages": "Усього повідомлень",

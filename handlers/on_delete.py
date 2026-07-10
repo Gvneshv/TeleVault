@@ -15,6 +15,9 @@ Consequences and how we handle them:
   - event.chat_id is set   -> standard flag_deleted(chat_id, msg_id)
   - event.chat_id is None  -> fall back to flagging by message ID only,
     which may match the same tg_message_id in multiple chats (rare but possible). Logged.
+
+self_id (passed in via register()) is the archiving account's own Telegram user ID,
+forwarded to flag_deleted() for Saved Messages detection — see db/queries.py's flag_deleted() docstring for why that's the one private chat where the deletion actor can be known for certain.
 """
 
 import logging
@@ -25,7 +28,7 @@ import db
 logger = logging.getLogger(__name__)
 
 
-def register(client) -> None:
+def register(client, self_id: int) -> None:
     """
     Attach the MessageDeleted handler to the given Telethon client.
     """
@@ -49,7 +52,7 @@ def register(client) -> None:
             # Happy path: we know exactly which chat these belong to
             for msg_id in deleted_ids:
                 try:
-                    db.queries.flag_deleted(conn, tg_message_id=msg_id, chat_id=chat_id)
+                    db.queries.flag_deleted(conn, tg_message_id=msg_id, chat_id=chat_id, self_id=self_id)
                 except Exception:
                     logger.exception(f"Failed to flag deletion for message {msg_id} in chat {chat_id}.")
         else:
@@ -61,13 +64,13 @@ def register(client) -> None:
             )
             for msg_id in deleted_ids:
                 try:
-                    _flag_deleted_without_chat(conn, msg_id)
+                    _flag_deleted_without_chat(conn, msg_id, self_id)
                 except Exception:
                     logger.exception(f"Failed fallback deletion flag for message {msg_id}.")
 
 
 
-def _flag_deleted_without_chat(conn, tg_message_id: int) -> None:
+def _flag_deleted_without_chat(conn, tg_message_id: int, self_id: int) -> None:
     """
     Flag a message as deleted when the chat ID is unknown.
  
@@ -118,7 +121,8 @@ def _flag_deleted_without_chat(conn, tg_message_id: int) -> None:
             conn, 
             tg_message_id=row["tg_message_id"], 
             chat_id=row["chat_id"], 
-            deleted_at=datetime.now(timezone.utc)
+            deleted_at=datetime.now(timezone.utc),
+            self_id=self_id,
         )
 
 

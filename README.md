@@ -147,8 +147,10 @@ A few things worth knowing:
   loading, but data always requires a live connection — `/api/*` is
   deliberately excluded from the cache, since this is private data and a
   stale cached result would be misleading, not just old.
-- **Theme and language:** toggle in the top-right of the nav rail (☀/☾ for
-  theme, EN/UK for language). Both persist across visits via `localStorage`.
+- **Theme and language:** toggle at the bottom of the nav rail (☀/☾ for
+  theme, EN/UK for language) — on narrow/mobile screens, where the nav
+  collapses to a top bar, they move to the right end of that bar instead.
+  Both persist across visits via `localStorage`.
 - **Interactive API docs:** available at `http://localhost:8000/api/docs`
   (Swagger UI) if you want to explore the endpoints directly.
 - **Deployment note:** for always-on use, run this the same way as the
@@ -212,4 +214,4 @@ televault/
   deploy this on a VPS reachable from the internet, put it behind something
   that authenticates first (e.g. Nginx with basic auth, a VPN, or an
   SSH tunnel) rather than exposing the port directly. Login/auth for the web
-  UI itself isn't planned yet=.
+  UI itself isn't planned yet.

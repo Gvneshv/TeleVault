@@ -28,7 +28,7 @@ from handlers import on_message, on_delete, on_edit
 logger = logging.getLogger(__name__)
 
 
-def register_handlers(client: TelegramClient) -> None:
+def register_handlers(client: TelegramClient, self_id: int) -> None:
     """
     Attach all Telethon event handlers to the client.
  
@@ -39,9 +39,14 @@ def register_handlers(client: TelegramClient) -> None:
         # rather than a bare module-level decorator
  
     This keeps the client out of module-level scope in the handler files and makes unit testing easier - you can call register(mock_client) without needing a real Telethon connection.
+
+    self_id (the archiving account's own Telegram user ID) is passed to on_delete specifically:
+    it's needed to recognize Saved Messages (the one chat where chat_id == your own user ID)
+    for deletion-actor inference — only the account owner has access to their own Saved Messages, so any deletion there is deterministically 'self', not a guess.
+    See db/queries.py's flag_deleted() for where this is actually used.
     """
     on_message.register(client)
-    on_delete.register(client)
+    on_delete.register(client, self_id)
     on_edit.register(client)
     logger.info("Event handlers registered.")
   
@@ -78,7 +83,7 @@ async def main() -> None:
     # ------------------------------------------------------------------ #
     # 4. Event handlers                                                   
     # ------------------------------------------------------------------ #
-    register_handlers(client)
+    register_handlers(client, self_id=me.id)
 
     # ------------------------------------------------------------------ #
     # 5. Run                                                              
