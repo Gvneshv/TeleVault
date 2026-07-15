@@ -355,6 +355,29 @@ input:focus-visible {
   font-family: var(--font-mono);
   font-size: 12.5px;
   color: var(--color-ink-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Small enough to feel like part of the "Page X of Y" text, not a separate form control bolted on - deliberately not styled like a prominent input. */
+.pagination__jump-input {
+  width: 3.5em;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  padding: 2px 4px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-raised);
+  color: var(--color-ink);
+  /* Hide the native up/down spinner - not needed for a 4-5 digit page jump. */
+  -moz-appearance: textfield;
+}
+.pagination__jump-input::-webkit-outer-spin-button,
+.pagination__jump-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 /* Rows stack more loosely on narrow viewports — stats move under the name instead of competing for horizontal space next to a long chat name. */
@@ -587,6 +610,18 @@ input:focus-visible {
 .stats-table td.stats-table__num,
 .stats-table td.stats-table__date {
   color: var(--color-ink-muted);
+}
+
+/* Sortable column headers - cursor makes it obvious they're clickable;
+   the hover tint is a second, lower-key hint at the same thing. */
+.stats-table__sortable {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.stats-table__sortable:hover {
+  color: var(--color-ink);
 }
 
 /* ---------------------------------------------------------------------
