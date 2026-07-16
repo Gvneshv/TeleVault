@@ -14,7 +14,13 @@ The direct attributes are only populated when Telegram includes the full entity 
 
 import logging
 
-from telethon import events
+from telethon import events, utils
+from telethon.tl.types import (
+    MessageActionChatMigrateTo,
+    MessageActionChannelMigrateFrom,
+    PeerChat,
+    PeerChannel,
+)
 
 import db
 from .helpers import get_chat_type, get_sender_fields, resolve_message_text
@@ -36,6 +42,27 @@ def register(client) -> None:
         All other service messages and media-only messages (stickers, photos, etc.) are skipped — out of scope for Phase 1.
         """
         message = event.message
+
+        # --- Chat migration detection ---------------------------------------
+        # Fires once in each chat at the moment a basic group is upgraded to a supergroup.
+        # Neither message carries archivable text, so this must be handled before resolve_message_text()/the "not text" skip below.
+        action = getattr(message, "action", None)
+        if isinstance(action, MessageActionChatMigrateTo):
+            # Fires in the OLD chat. event.chat_id is the old id; action.channel_id
+            # is the new supergroup's raw (unmarked) id.
+            new_chat_id = utils.get_peer_id(PeerChannel(action.channel_id))
+            db.queries.record_chat_migration(
+                db.get_connection(), old_chat_id=event.chat_id, new_chat_id=new_chat_id
+            )
+            return
+        if isinstance(action, MessageActionChannelMigrateFrom):
+            # Fires in the NEW supergroup. event.chat_id is the new id; action.chat_id
+            # is the old basic group's raw (unmarked) id.
+            old_chat_id = utils.get_peer_id(PeerChat(action.chat_id))
+            db.queries.record_chat_migration(
+                db.get_connection(), old_chat_id=old_chat_id, new_chat_id=event.chat_id
+            )
+            return
 
         # --- Resolve the text to archive -----------------------------------
         # See handlers/helpers.py's resolve_message_text() - shared with backfill.py so both apply the same archiving rules.

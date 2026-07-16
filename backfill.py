@@ -27,8 +27,9 @@ import argparse
 import asyncio
 import logging
 
-from telethon import TelegramClient
+from telethon import TelegramClient, functions, utils
 from telethon.errors import FloodWaitError
+from telethon.tl.types import PeerChat
 
 import db
 from config import settings
@@ -53,6 +54,18 @@ async def backfill_chat(client: TelegramClient, conn, chat, limit: int | None) -
     chat_type = get_chat_type(chat)
     chat_name = getattr(chat, "title", None) or getattr(chat, "first_name", None)
     chat_username = (getattr(chat, "username", None) or "").lstrip("@") or None
+
+    # Detect a completed group->supergroup migration before archiving history, so any messages stored below go under the canonical (new) chat_id,
+    # and any pre-existing basic-group rows get picked up by merge_migrated_chats.py instead of staying orphaned.
+    if chat_type in ("supergroup", "channel"):
+        try:
+            full = await client(functions.channels.GetFullChannelRequest(chat))
+            migrated_from = getattr(full.full_chat, "migrated_from_chat_id", None)
+            if migrated_from:
+                old_chat_id = utils.get_peer_id(PeerChat(migrated_from))
+                db.queries.record_chat_migration(conn, old_chat_id=old_chat_id, new_chat_id=chat.id)
+        except Exception:
+            logger.exception(f"Could not check migration status for '{chat_name}' - continuing without it.")
 
     db.queries.upsert_chat(
         conn,
