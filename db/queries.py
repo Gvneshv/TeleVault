@@ -84,6 +84,8 @@ def upsert_chat(
     Note: first_seen uses SQLite's DEFAULT CURRENT_TIMESTAMP (UTC).
     This column is metadata about when TeleVault first saw the chat, not a message timestamp, so the UTC offset is acceptable here.
     """
+    chat_id = resolve_chat_id(conn, chat_id)
+
     conn.execute(
         "INSERT OR IGNORE INTO chats (chat_id, name, username, chat_type) VALUES (?, ?, ?, ?)",
         (chat_id, name, username, chat_type),
@@ -109,6 +111,50 @@ def upsert_chat(
             f"likely failed the CHECK constraint. "
             f"Valid values: 'private', 'group', 'supergroup', 'channel'."
         )
+
+
+def record_chat_migration(conn: sqlite3.Connection, old_chat_id: int, new_chat_id: int) -> None:
+    """
+    Record that old_chat_id has migrated to new_chat_id (basic group -> supergroup upgrade).
+
+    INSERT OR IGNORE: if this migration was already recorded
+    - e.g. both the MessageActionChatMigrateTo and MessageActionChannelMigrateFrom service messages fired for the same event,
+    or backfill re-detects it on a later run - this is a no-op.
+
+    Does not touch any existing chats/messages rows.
+    resolve_chat_id() applies the mapping at write time going forward only;
+    run merge_migrated_chats.py separately to fix up rows already stored under old_chat_id before this mapping existed.
+    """
+    if old_chat_id == new_chat_id:
+        return
+    conn.execute(
+        "INSERT OR IGNORE INTO chat_migrations (old_chat_id, new_chat_id) VALUES (?, ?)",
+        (old_chat_id, new_chat_id),
+    )
+    _commit(conn)
+    logger.info(f"Recorded chat migration: {old_chat_id} -> {new_chat_id}.")
+
+
+def resolve_chat_id(conn: sqlite3.Connection, chat_id: int) -> int:
+    """
+    Canonicalize a chat_id through any recorded migration chain.
+
+    Walks chat_migrations in case a chat migrated more than once (rare, but not assumed to be a single hop).
+    Returns chat_id unchanged if nothing is recorded for it.
+    """
+    seen = {chat_id}
+    current = chat_id
+    while True:
+        row = conn.execute(
+            "SELECT new_chat_id FROM chat_migrations WHERE old_chat_id = ?", (current,)
+        ).fetchone()
+        if row is None:
+            return current
+        current = row[0]
+        if current in seen:
+            logger.warning(f"Migration cycle detected resolving chat_id {chat_id} - stopping at {current}.")
+            return current
+        seen.add(current)
 
 
 # ---------------------------------------------------------------------------
@@ -183,6 +229,8 @@ def insert_message(
  
     Returns the internal row ID (messages.id) on success, or None if the message was already present (INSERT OR IGNORE - safe on re-delivery)
     """
+    chat_id = resolve_chat_id(conn, chat_id)
+
     local_date = _localise(date)
     local_archived_at = _now()
 

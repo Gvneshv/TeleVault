@@ -16,6 +16,7 @@ Schema change log:
   v2           : chats.username added for @handle cross-referencing
   v3           : message_deletions table added (mirrors message_edits)
   v4           : read-path indexes on messages (chat_id+date, date, sender_id, partial indexes on is_deleted/is_edited) - added once list views got slow at real scale (Phase 3); the only prior messages index served write-path dedup, not any read query
+  v5           : chat_migrations table - maps an old (pre-migration) chat_id to its canonical new chat_id.
 """
 
 import logging
@@ -156,8 +157,21 @@ _CREATE_MESSAGE_DELETIONS_INDEX = """
 CREATE INDEX IF NOT EXISTS idx_message_deletions_message_id ON message_deletions(message_id);
 """
 
+# Populated when a basic group upgrades to a supergroup, detected either live (MessageActionChatMigrateTo/MessageActionChannelMigrateFrom service messages)
+# or during backfill (ChannelFull.migrated_from_chat_id).
+# Read by queries.resolve_chat_id() so every future write is canonicalized automatically.
+_CREATE_CHAT_MIGRATIONS = """
+CREATE TABLE IF NOT EXISTS chat_migrations (
+  old_chat_id   INTEGER PRIMARY KEY,
+  new_chat_id   INTEGER NOT NULL,
+  migrated_at   DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+"""
+
+
 _STATEMENTS = [
         ("chats table",         _CREATE_CHATS),
+        ("chat_migrations table", _CREATE_CHAT_MIGRATIONS),
         ("senders table",       _CREATE_SENDERS),
         ("messages table",      _CREATE_MESSAGES),
         ("messages index",      _CREATE_MESSAGES_INDEX),
