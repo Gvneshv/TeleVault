@@ -43,7 +43,7 @@ def get_db() -> Generator[sqlite3.Connection, None, None]:
     uri = f"file:{db_path}?mode=ro"
 
     try:
-        conn = sqlite3.connect(uri, uri=True)
+        conn = sqlite3.connect(uri, uri=True, check_same_thread=False)
         # Return rows as sqlite3.Row so columns are accessible by name, though _rows_to_dicts() in read_queries.py converts them to plain dicts before they reach here.
         conn.row_factory = sqlite3.Row
     except sqlite3.OperationalError as exc:
