@@ -79,7 +79,7 @@ def _handle_sigterm(signum, frame) -> None:
     logger.info("Cancellation requested - finishing the current message, then stopping.")
 
 
-async def backfill_chat(client: TelegramClient, conn, chat, limit: int | None) -> tuple[int, int]:
+async def backfill_chat(client: TelegramClient, conn, chat, limit: int | None, status_cb=None) -> tuple[int, int]:
     """
     Archive all currently-existing history for one chat.
 
@@ -127,7 +127,7 @@ async def backfill_chat(client: TelegramClient, conn, chat, limit: int | None) -
         if processed % PROGRESS_INTERVAL == 0:
             logger.info(f"  ...{processed} messages processed so far ({stored} stored).")
             if status_cb:
-                status_cb(processed=processed)
+                status_cb(processed)
 
         text = resolve_message_text(message)
         if not text:
@@ -234,6 +234,13 @@ async def run(chat_selector: str | None, limit: int | None) -> None:
         failed = False
         for attempt in range(1, max_flood_retries + 1):
             try:
+                status["current_chat"] = name
+                base_processed = status["overall_processed"]
+
+                def _status_cb(processed_in_chat, base=base_processed):
+                    status["overall_processed"] = base + processed_in_chat
+                    _write_status(status)
+
                 stored, skipped = await backfill_chat(client, conn, chat, limit)
                 break
             except FloodWaitError as e:
