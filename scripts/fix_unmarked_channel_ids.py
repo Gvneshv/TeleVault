@@ -9,7 +9,7 @@ import sqlite3
 
 from config import settings
 from utils.logging_setup import setup_logging
-from merge_migrated_chats import merge_all
+from scripts.merge_migrated_chats import merge_all
 import db.queries as queries
 
 logger = logging.getLogger(__name__)

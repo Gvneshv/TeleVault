@@ -1,0 +1,1 @@
+0 * * * * /backup_db.sh >> ../logs/backup.log 2>&1

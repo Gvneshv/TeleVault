@@ -18,8 +18,6 @@ def merge_all(conn: sqlite3.Connection) -> None:
     migrations = conn.execute("SELECT old_chat_id, new_chat_id FROM chat_migrations").fetchall()
 
     for old_id, new_id in migrations:
-        # OR IGNORE: in the unlikely case a tg_message_id collides between the old and new chat's history
-        # (Telegram's migrated_from_max_id should prevent this, but don't let one bad row abort the whole merge), skip it and log rather than fail.
         cursor = conn.execute(
             "UPDATE OR IGNORE messages SET chat_id = ? WHERE chat_id = ?", (new_id, old_id)
         )
@@ -34,10 +32,35 @@ def merge_all(conn: sqlite3.Connection) -> None:
             conn.execute("DELETE FROM chats WHERE chat_id = ?", (old_id,))
             conn.commit()
             logger.info(f"Merged chat {old_id} -> {new_id}: moved {moved} messages, old chat row removed.")
+            continue
+
+        # Rows still here collided with an already-existing row under new_id - i.e. this message was archived twice, once under each ID convention,
+        # before the backfill raw/marked ID bug was fixed.
+        # new_id is the copy every edit/deletion handler keys its lookups against, so it's canonical;
+        # these are dead duplicates.
+        leftover = conn.execute(
+            "SELECT id FROM messages WHERE chat_id = ?", (old_id,)
+        ).fetchall()
+        for (msg_id,) in leftover:
+            conn.execute("DELETE FROM message_edits WHERE message_id = ?", (msg_id,))
+            conn.execute("DELETE FROM message_deletions WHERE message_id = ?", (msg_id,))
+            conn.execute("DELETE FROM messages WHERE id = ?", (msg_id,))
+        conn.commit()
+
+        still_remaining = conn.execute(
+            "SELECT COUNT(*) FROM messages WHERE chat_id = ?", (old_id,)
+        ).fetchone()[0]
+        if still_remaining == 0:
+            conn.execute("DELETE FROM chats WHERE chat_id = ?", (old_id,))
+            conn.commit()
+            logger.info(
+                f"Merged chat {old_id} -> {new_id}: moved {moved} messages, removed "
+                f"{len(leftover)} duplicate leftovers, old chat row removed."
+            )
         else:
             logger.warning(
-                f"Merged chat {old_id} -> {new_id}: moved {moved} messages, but {remaining} rows "
-                f"could not be moved (tg_message_id collision) - old chat row kept for inspection."
+                f"Chat {old_id} -> {new_id}: still has {still_remaining} rows after "
+                f"collision cleanup - needs manual review."
             )
 
 
