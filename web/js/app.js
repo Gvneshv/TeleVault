@@ -21,6 +21,7 @@ import { initMessagesView } from "./views/messages.js";
 import { initDeletedView } from "./views/deleted.js";
 import { initStatsView } from "./views/stats.js";
 import { initHealthView } from "./views/health.js";
+import { initBackfillView } from "./views/backfill.js";
 
 document.addEventListener("DOMContentLoaded", () => {
   const links = document.querySelectorAll(".app-nav__link[data-view]");
@@ -44,6 +45,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (viewName === "deleted") initDeletedView();
     if (viewName === "stats") initStatsView();
     if (viewName === "health") initHealthView();
+    if (viewName === "backfill") initBackfillView();
   }
 
   links.forEach((link) => {

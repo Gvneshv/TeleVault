@@ -20,7 +20,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from .routes import chats, messages, deleted, stats, health
+from .routes import chats, messages, deleted, stats, health, backfill, telethon
 
 
 # ---------------------------------------------------------------------------
@@ -68,11 +68,13 @@ app = FastAPI(
 # API routes — all prefixed with /api to allow Nginx to proxy them cleanly
 # ---------------------------------------------------------------------------
 
-app.include_router(health.router,   prefix="/api")
-app.include_router(chats.router,    prefix="/api")
-app.include_router(messages.router, prefix="/api")
-app.include_router(deleted.router,  prefix="/api")
-app.include_router(stats.router,    prefix="/api")
+app.include_router(health.router,    prefix="/api")
+app.include_router(chats.router,     prefix="/api")
+app.include_router(messages.router,  prefix="/api")
+app.include_router(deleted.router,   prefix="/api")
+app.include_router(stats.router,     prefix="/api")
+app.include_router(backfill.router,  prefix="/api")
+app.include_router(telethon.router,  prefix="/api")
 
 
 # ---------------------------------------------------------------------------

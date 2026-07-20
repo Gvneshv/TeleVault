@@ -75,4 +75,51 @@ export const uk = {
 
   "theme.toggleLabel": "Змінити тему",
   "lang.selectLabel": "Мова",
+
+  // Backfill additions
+  "nav.backfill": "Резервне заповнення",
+
+  "backfill.aboutTitle": "Про резервне заповнення",
+  "backfill.disclaimerSession":
+    "Для заповнення потрібне окреме з'єднання з Telegram. Спершу зупиніть живий архіватор (main.py) — Telegram дозволяє лише одну активну сесію одночасно.",
+  "backfill.disclaimerDeleted":
+    "Повідомлення, видалені ще до того, як чат почали архівувати, відновити неможливо — API історії Telegram повертає лише те, що існує зараз.",
+  "backfill.disclaimerEdits":
+    "Заповнені повідомлення зберігаються лише в поточному вигляді. Попередні відредаговані версії до початку архівування відновити неможливо.",
+  "backfill.disclaimerApprox":
+    "Прогрес і залишок часу — приблизні оцінки на основі кількості повідомлень у Telegram, а не точні значення.",
+  "backfill.disclaimerBackground":
+    "Після запуску заповнення продовжує працювати на сервері, навіть якщо ви закриєте вкладку чи браузер.",
+  "backfill.checkingConnection": "Перевірка з'єднання…",
+  "backfill.connectionOn": "Живий архіватор зараз підключено",
+  "backfill.connectionOff": "Живий архіватор не підключено",
+  "backfill.startButton": "Почати заповнення",
+  "backfill.confirmTitle": "Почати заповнення?",
+  "backfill.confirmBody":
+    "Це заархівує історичні повідомлення для вибраного чату (чатів). Для великих історій це може зайняти багато часу.",
+  "backfill.warningConnectionOn":
+    "Схоже, живий архіватор досі підключено. Зупиніть його перед запуском заповнення.",
+  "backfill.chatLabel": "Чат (необов'язково — залиште порожнім для всіх чатів)",
+  "backfill.chatPlaceholder": "@username або числовий ID",
+  "backfill.limitLabel": "Ліміт повідомлень на чат (необов'язково)",
+  "backfill.limitPlaceholder": "напр. 500",
+  "backfill.confirmStart": "Почати",
+  "backfill.stateRunning": "Виконується",
+  "backfill.stateCompleted": "Завершено",
+  "backfill.stateCancelled": "Скасовано",
+  "backfill.stateError": "Помилка",
+  "backfill.chats": "чатів",
+  "backfill.eta": "Залишилось приблизно",
+  "backfill.cancel": "Скасувати",
+  "backfill.historyTitle": "Історія запусків",
+  "backfill.noHistory": "Заповнень ще не було.",
+  "backfill.historyStarted": "Розпочато",
+  "backfill.historyStatus": "Статус",
+  "backfill.historyChats": "Чатів",
+  "backfill.historyStored": "Збережено",
+  "backfill.historySkipped": "Пропущено",
+  "backfill.historyDuration": "Тривалість",
+
+  "messages.wholeWordLabel": "Ціле слово",
+  "common.cancel": "Скасувати",
 };

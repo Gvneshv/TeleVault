@@ -13,10 +13,12 @@ import sqlite3
 import time
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
 from config import settings
+
+from api.dependencies import get_db
 
 router = APIRouter(prefix="/api/backfill", tags=["backfill"])
 STALE_AFTER_SECONDS = 60
@@ -78,13 +80,10 @@ def get_backfill_status():
 
 
 @router.get("/history")
-def get_backfill_history():
-    conn = sqlite3.connect(f"file:{settings.db_path}?mode=ro", uri=True)
-    conn.row_factory = sqlite3.Row
-    rows = conn.execute(
+def get_backfill_history(db: sqlite3.Connection = Depends(get_db)):
+    rows = db.execute(
         "SELECT id, started_at, finished_at, status, chats_total, chats_done, "
         "messages_stored, messages_skipped, error_message FROM backfill_runs "
         "ORDER BY started_at DESC LIMIT 50"
     ).fetchall()
-    conn.close()
     return [dict(row) for row in rows]

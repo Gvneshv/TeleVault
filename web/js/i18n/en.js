@@ -79,4 +79,51 @@ export const en = {
 
   "theme.toggleLabel": "Toggle theme",
   "lang.selectLabel": "Language",
+
+  // Backfill additions
+  "nav.backfill": "Backfill",
+
+  "backfill.aboutTitle": "About backfill",
+  "backfill.disclaimerSession":
+    "Backfill needs its own Telegram connection. The live archiver (main.py) must be stopped first — Telegram only allows one active session at a time.",
+  "backfill.disclaimerDeleted":
+    "Messages already deleted before a chat was first archived can never be recovered — Telegram's history API only returns what currently exists.",
+  "backfill.disclaimerEdits":
+    "Backfilled messages are stored as their current text only. Earlier edited versions from before archiving started cannot be recovered.",
+  "backfill.disclaimerApprox":
+    "Progress and time remaining are estimates based on Telegram's message counts — treat them as a rough guide, not an exact figure.",
+  "backfill.disclaimerBackground":
+    "Once started, backfill keeps running on the server even if you close this tab or browser.",
+  "backfill.checkingConnection": "Checking live connection…",
+  "backfill.connectionOn": "Live archiver is currently connected",
+  "backfill.connectionOff": "Live archiver is not connected",
+  "backfill.startButton": "Start backfill",
+  "backfill.confirmTitle": "Start a backfill?",
+  "backfill.confirmBody":
+    "This will archive historical messages for the selected chat(s). It can take a long time for large histories.",
+  "backfill.warningConnectionOn":
+    "The live archiver looks like it's still connected. Stop it before starting a backfill.",
+  "backfill.chatLabel": "Chat (optional — leave empty for all chats)",
+  "backfill.chatPlaceholder": "@username or numeric ID",
+  "backfill.limitLabel": "Message limit per chat (optional)",
+  "backfill.limitPlaceholder": "e.g. 500",
+  "backfill.confirmStart": "Start",
+  "backfill.stateRunning": "Running",
+  "backfill.stateCompleted": "Completed",
+  "backfill.stateCancelled": "Cancelled",
+  "backfill.stateError": "Error",
+  "backfill.chats": "chats",
+  "backfill.eta": "Est. remaining",
+  "backfill.cancel": "Cancel",
+  "backfill.historyTitle": "Run history",
+  "backfill.noHistory": "No backfill runs yet.",
+  "backfill.historyStarted": "Started",
+  "backfill.historyStatus": "Status",
+  "backfill.historyChats": "Chats",
+  "backfill.historyStored": "Stored",
+  "backfill.historySkipped": "Skipped",
+  "backfill.historyDuration": "Duration",
+
+  "messages.wholeWordLabel": "Whole word",
+  "common.cancel": "Cancel",
 };
