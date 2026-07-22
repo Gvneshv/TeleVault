@@ -151,33 +151,19 @@ def get_chats(
     """
     Return all known chats sorted by most recent activity descending (i.e. the same ordering as the Telegram sidebar).
 
-    Each row includes aggregate counts computed with subqueries so the chat list can be rendered without additional per-chat requests.
+    message_count/deleted_count/last_message_at/last_message_preview are denormalized columns on chats itself (see db/migrations/005_chat_denormalized_counters.py),
+    kept in sync by triggers on the messages table - this used to be a LEFT JOIN + GROUP BY across every message on every request,
+    which got slow as the archive grew since it always scanned the whole messages table regardless of which page was requested.
+    Now it's a plain, constant-cost read over the (small) chats table.
 
     Columns returned:
         chat_id, name, username, chat_type, first_seen, message_count, deleted_count, last_message_at, last_message_preview
     """
     sql = """
         SELECT
-            c.chat_id,
-            c.name,
-            c.username,
-            c.chat_type,
-            c.first_seen,
-            COUNT(m.id)                                         AS message_count,
-            SUM(CASE WHEN m.is_deleted = 1 THEN 1 ELSE 0 END)   AS deleted_count,
-            MAX(m.date)                                         AS last_message_at,
-            -- Truncate preview to 80 chars; SUBSTR does nothing if text is NULL.
-            SUBSTR(
-                (SELECT m2.text
-                 FROM messages m2
-                 WHERE m2.chat_id = c.chat_id
-                 ORDER BY m2.date DESC
-                 LIMIT 1),
-                1, 80
-            )                                                   AS last_message_preview
-        FROM chats c
-        LEFT JOIN messages m ON m.chat_id = c.chat_id
-        GROUP BY c.chat_id
+            chat_id, name, username, chat_type, first_seen,
+            message_count, deleted_count, last_message_at, last_message_preview
+        FROM chats
         ORDER BY last_message_at DESC NULLS LAST
     """
     return _paginate(sql, [], conn, page, per_page)
@@ -187,29 +173,15 @@ def get_chat(conn: sqlite3.Connection, chat_id: int) -> dict[str, Any] | None:
     """
     Return a single chat record with aggregate counts.
     Returns None if the chat_id is not in the database.
+
+    See get_chats()'s docstring - counts are denormalized columns, not computed here.
     """
     sql = """
         SELECT
-            c.chat_id,
-            c.name,
-            c.username,
-            c.chat_type,
-            c.first_seen,
-            COUNT(m.id)                                         AS message_count,
-            SUM(CASE WHEN m.is_deleted = 1 THEN 1 ELSE 0 END)   AS deleted_count,
-            MAX(m.date)                                         AS last_message_at,
-            SUBSTR(
-                (SELECT m2.text
-                 FROM messages m2
-                 WHERE m2.chat_id = c.chat_id
-                 ORDER BY m2.date DESC
-                 LIMIT 1),
-                1, 80
-            )                                                   AS last_message_preview
-        FROM chats c
-        LEFT JOIN messages m ON m.chat_id = c.chat_id
-        WHERE c.chat_id = ?
-        GROUP BY c.chat_id
+            chat_id, name, username, chat_type, first_seen,
+            message_count, deleted_count, last_message_at, last_message_preview
+        FROM chats
+        WHERE chat_id = ?
     """
     cursor = conn.execute(sql, [chat_id])
     row = cursor.fetchone()
@@ -496,11 +468,13 @@ def get_stats(conn: sqlite3.Connection) -> dict[str, Any]:
     Aggregate statistics for the /api/stats endpoint.
 
     Runs three queries:
-        1. Global totals (counts, archiving_since).
-        2. Per-chat breakdown sorted by message volume descending.
+        1. Global totals (counts, archiving_since) - a single-pass scan over messages, no GROUP BY, so this stays fast at any archive size.
+        2. total_chats / total_senders - trivial COUNT(*) on small tables.
+        3. Per-chat breakdown - reads the denormalized counters on chats directly (see db/migrations/005_chat_denormalized_counters.py)
+           instead of a LEFT JOIN + GROUP BY across every message, which used to make this endpoint slower the larger the archive grew.
 
-    These are intentionally separate queries rather than one large JOIN so SQLite's query planner handles each simply.
-    Stats are not latency-critical — they're for a dashboard, not a hot path.
+    Stats are not latency-critical - they're for a dashboard, not a hot path -
+    but the per-chat breakdown doesn't need to be slow just because it's not urgent.
     """
     totals_row = conn.execute(
         """
@@ -519,17 +493,10 @@ def get_stats(conn: sqlite3.Connection) -> dict[str, Any]:
     per_chat_cursor = conn.execute(
         """
         SELECT
-            c.chat_id,
-            c.name,
-            c.chat_type,
-            COUNT(m.id)                                        AS message_count,
-            SUM(CASE WHEN m.is_deleted = 1 THEN 1 ELSE 0 END) AS deleted_count,
-            SUM(CASE WHEN m.is_edited  = 1 THEN 1 ELSE 0 END) AS edited_count,
-            MIN(m.date)                                        AS first_message_at,
-            MAX(m.date)                                        AS last_message_at
-        FROM chats c
-        LEFT JOIN messages m ON m.chat_id = c.chat_id
-        GROUP BY c.chat_id
+            chat_id, name, chat_type,
+            message_count, deleted_count, edited_count,
+            first_message_at, last_message_at
+        FROM chats
         ORDER BY message_count DESC
         """
     )
