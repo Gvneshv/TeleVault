@@ -1,1 +1,4 @@
-0 * * * * /backup_db.sh >> ../logs/backup.log 2>&1
+# Set this once to the absolute path where you cloned TeleVault, e.g. /home/youruser/TeleVault
+TELEVAULT_HOME=W:\Projects\TeleVault
+
+0 * * * * mkdir -p $TELEVAULT_HOME\logs && $TELEVAULT_HOME\scripts/backup_db.sh >> $TELEVAULT_HOME\logs\backup.log 2>&1
